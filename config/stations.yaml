@@ -1,0 +1,67 @@
+# BAFU stations used by FlowGuard (decided 09.10.2026, see docs/data_notes.md).
+#
+# role:
+#   target        forecast 24 h ahead (needs W)
+#   input         only its discharge Q is used as a feature (needs Q)
+#   observe_only  data is collected but not used by the model
+# number: BAFU station number as a string. The key is not "no", because YAML reads no as false.
+# parameters: what BAFU delivers for the station (probe 08.10.2026).
+# Upstream slots (empty where a station has none):
+#   up_main  gauge further up the same river
+#   up_trib  gauge on a tributary that joins above this station
+#   div_q    diversion flows (Q) that leave the river above this station
+
+stations:
+  - number: "2087"
+    name: Andermatt
+    river: Reuss
+    role: target
+    parameters: [Q, W]
+    up_main: null
+    up_trib: null
+    div_q: []
+
+  - number: "2491"
+    name: Bürglen, Galgenwäldli
+    river: Schächen
+    role: target
+    parameters: [Q, W]
+    up_main: null
+    up_trib: null
+    div_q: []
+
+  - number: "2056"
+    name: Seedorf
+    river: Reuss
+    role: target
+    parameters: [Q, W, WT]
+    up_main: "2087"
+    up_trib: "2491"
+    div_q: ["2492", "2649"]
+
+  - number: "2492"
+    name: Bürglen, EW Altdorf
+    river: Dorfbachableitung
+    role: input
+    parameters: [Q]
+    up_main: null
+    up_trib: null
+    div_q: []
+
+  - number: "2649"
+    name: Bürglen, KW Schächen
+    river: Ableitung EWA
+    role: input
+    parameters: [Q]
+    up_main: null
+    up_trib: null
+    div_q: []
+
+  - number: "2299"
+    name: Erstfeld, Bodenberg
+    river: Alpbach
+    role: observe_only
+    parameters: [Q, W]
+    up_main: null
+    up_trib: null
+    div_q: []
