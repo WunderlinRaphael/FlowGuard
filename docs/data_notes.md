@@ -8,7 +8,8 @@ Script: `scripts/probe_bafu.py` (`uv run python scripts/probe_bafu.py`).
 - Endpoint: `https://data.bafu.admin.ch/api`, HTTP POST with a JSON body `{"query": ..., "variables": ...}`, no key.
 - Station metadata: `water { observations { stations(where: { no: { _in: $nos } }) { no name riverName status coverageFrom coverageTo } } }`.
 - Hourly values: `water { observations { data_1hour_mean(where: { station: { no: { _eq: $station } }, timestamp: { _gte: $from, _lt: $to } }) { timestamp parameterName value unitSymbol } } }`. Timestamps are ISO UTC strings (`AWSDateTime`), the station number is a string.
-- One row per timestamp and parameter. A query returns at most 10,000 rows, so the probe fetches one day per request (at most 72 rows). Errors come back in an `errors` field, also with HTTP 200, so the script checks for it.
+- One row per timestamp and parameter. A query that would return more than 10,000 rows is rejected, not cut off: HTTP 200 with `errors[0].message` "Query returned more than 10000 rows. Please narrow your query using filters or specify a limit." (tested 09.10.2026 with 5 months of Seedorf). The probe fetches one day per request (at most 72 rows). Errors come back in an `errors` field, also with HTTP 200, so the script checks for it.
+- Rate limit (https://data.bafu.admin.ch/rate-limits): 500 requests per IP in a sliding 5-minute window. Above that the server answers HTTP 403 until the window drops below the limit. BAFU recommends fewer, larger requests, run one after the other, and a short pause before retrying a 403.
 
 ## Station metadata
 
