@@ -42,6 +42,11 @@ def test_every_input_has_q(stations):
         assert "Q" in s.parameters, s.number
 
 
+def test_seedorf_lists_wt(stations):
+    # WT is stored raw at Seedorf (decision 09.10.2026), so the client must fetch it.
+    assert "WT" in by_number(stations)["2056"].parameters
+
+
 def test_seedorf_upstream_slots(stations):
     seedorf = by_number(stations)["2056"]
     assert seedorf.up_main == "2087"

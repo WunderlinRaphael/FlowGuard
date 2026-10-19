@@ -5,7 +5,8 @@
 #   input         only its discharge Q is used as a feature (needs Q)
 #   observe_only  data is collected but not used by the model
 # number: BAFU station number as a string. The key is not "no", because YAML reads no as false.
-# parameters: what BAFU delivers for the station (probe 08.10.2026).
+# parameters: what BAFU delivers for the station (probe 08.10.2026). The client fetches all
+#   of them and stores them raw; WT at Seedorf is stored but not used as a feature.
 # Upstream slots (empty where a station has none):
 #   up_main  gauge further up the same river
 #   up_trib  gauge on a tributary that joins above this station
