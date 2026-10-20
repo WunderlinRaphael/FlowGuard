@@ -1,0 +1,73 @@
+{
+  "data": {
+    "water": {
+      "observations": {
+        "data_1hour_mean": [
+          {
+            "timestamp": "2026-10-08T06:00:00Z",
+            "parameterName": "Q",
+            "value": 17.468,
+            "unitSymbol": "m3/s",
+            "releaseState": null
+          },
+          {
+            "timestamp": "2026-10-08T07:00:00Z",
+            "parameterName": "Q",
+            "value": 14.407,
+            "unitSymbol": "m3/s",
+            "releaseState": null
+          },
+          {
+            "timestamp": "2026-10-08T08:00:00Z",
+            "parameterName": "Q",
+            "value": 14.372,
+            "unitSymbol": "m3/s",
+            "releaseState": null
+          },
+          {
+            "timestamp": "2026-10-08T06:00:00Z",
+            "parameterName": "W",
+            "value": 437.21,
+            "unitSymbol": "m ü.M.",
+            "releaseState": null
+          },
+          {
+            "timestamp": "2026-10-08T07:00:00Z",
+            "parameterName": "W",
+            "value": 437.135,
+            "unitSymbol": "m ü.M.",
+            "releaseState": null
+          },
+          {
+            "timestamp": "2026-10-08T08:00:00Z",
+            "parameterName": "W",
+            "value": 437.132,
+            "unitSymbol": "m ü.M.",
+            "releaseState": null
+          },
+          {
+            "timestamp": "2026-10-08T06:00:00Z",
+            "parameterName": "WT",
+            "value": 10.21,
+            "unitSymbol": "°C",
+            "releaseState": null
+          },
+          {
+            "timestamp": "2026-10-08T07:00:00Z",
+            "parameterName": "WT",
+            "value": 10.25,
+            "unitSymbol": "°C",
+            "releaseState": null
+          },
+          {
+            "timestamp": "2026-10-08T08:00:00Z",
+            "parameterName": "WT",
+            "value": 10.27,
+            "unitSymbol": "°C",
+            "releaseState": null
+          }
+        ]
+      }
+    }
+  }
+}

@@ -17,9 +17,6 @@ API_URL = "https://data.bafu.admin.ch/api"
 STATIONS = ["2087", "2299", "2491", "2492", "2649", "2056"]
 PARAMETERS = ["Q", "W", "WT"]
 DAYS = 7
-# The API returns at most this many rows per query. A response of exactly this
-# size means it was cut off and the window has to be smaller.
-ROW_LIMIT = 10_000
 # Stations and hours used to compare hourly means with 10-minute means.
 HOUR_LABEL_STATIONS = ["2087", "2491", "2056"]
 HOUR_LABEL_HOURS = [3, 7, 10, 13, 16, 20]
@@ -71,17 +68,18 @@ def parse(ts):
 
 
 def fetch_series(series, station, start, end):
-    """Fetch a series in 1-day windows so no single query hits the row limit."""
+    """Fetch a series in 1-day windows so no single query hits the row limit.
+
+    BAFU rejects a query with more than 10,000 rows with an error in "errors",
+    so post_query raises instead of returning a cut-off result.
+    """
     query = SERIES_QUERY.replace("SERIES", series)
     rows = []
     window_start = start
     while window_start < end:
         window_end = min(window_start + timedelta(days=1), end)
         variables = {"station": station, "from": iso(window_start), "to": iso(window_end)}
-        chunk = post_query(query, variables)[series]
-        if len(chunk) >= ROW_LIMIT:
-            print(f"  WARNING: {station} {iso(window_start)} hit the row limit, data is cut off")
-        rows.extend(chunk)
+        rows.extend(post_query(query, variables)[series])
         window_start = window_end
     return rows
 
