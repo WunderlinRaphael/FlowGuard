@@ -176,3 +176,22 @@ At 10,000 per day the 3-point backfill fits in about two days, the 2-point backf
 - Limits on the free tier: see section 5. Open-Meteo asks to contact them above 10,000 requests per day and may block abusive use.
 - Open-Meteo's own source code is AGPLv3. That does not affect this project, because only the API is used.
 - The licence page https://open-meteo.com/en/license could not be read as plain text (it needs JavaScript). The wording above comes from the terms page and the project's GitHub page. Check the exact wording on the licence page before writing the README.
+
+## Station coverage and approximate row counts (21.10.2026)
+
+From the BAFU `stations` query (`coverageFrom`, `coverageTo`), nothing downloaded. Rows are calculated, not counted: hours between the two dates, once per parameter listed in `config/stations.yaml`. The last two columns count from the backfill start 2011-01-01 (or from `coverageFrom` where it is later).
+
+| No. | Name | Parameters | Coverage from | Coverage to | Hourly rows per parameter, all coverage | Hourly rows per parameter since 2011-01-01 | Rows since 2011-01-01, all parameters | Requests since 2011-01-01 (30-day windows) |
+|---|---|---|---|---|---|---|---|---|
+| 2087 | Andermatt | Q, W | 1910-01-01 | 2026-10-21 | 1,023,888 | 138,528 | 277,056 | 193 |
+| 2491 | Bürglen, Galgenwäldli | Q, W | 1985-01-01 | 2026-10-21 | 366,432 | 138,528 | 277,056 | 193 |
+| 2056 | Seedorf | Q, W, WT | 1904-01-01 | 2026-10-21 | 1,076,496 | 138,528 | 415,584 | 193 |
+| 2492 | Bürglen, EW Altdorf | Q | 1986-01-01 | 2026-10-21 | 357,672 | 138,528 | 138,528 | 193 |
+| 2649 | Bürglen, KW Schächen | Q | 2020-01-01 | 2026-10-21 | 59,640 | 59,640 | 59,640 | 83 |
+| 2299 | Erstfeld, Bodenberg | Q, W | 1960-01-01 | 2026-10-21 | 585,600 | 138,528 | 277,056 | 193 |
+| | Total | | | | | | 1,444,920 | 1,048 |
+
+- The backfill from 2011-01-01 is about 1.4 million raw rows and about 1,050 requests. At 1 request per second that is about 18 minutes, which matches the "about 190 requests per station, about 20 minutes" estimate. The full history would be about 7.6 million rows.
+- Coverage exists only per station, not per parameter. An upper bound: W or WT may start later than Q, hourly means may start later than the station, and holes are not subtracted (2299, for example, has gaps and is days late).
+- `coverageTo` is the date of the query for all six stations, so it is metadata and not the age of the newest value (see the 7-day check above).
+- 2649 only exists since 2020-01-01. Its history before 2011 does not matter, but it has only about 6.8 years of data for the pooled model.
