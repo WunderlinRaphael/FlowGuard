@@ -16,7 +16,7 @@ The data comes from the Swiss Federal Office for the Environment (BAFU). I forec
 
 ## Status
 
-The station config, the BAFU client with tests and two data probes (BAFU and Open-Meteo) are done. The hourly grid, the weather client, the features, the storage and the scheduled run are not built yet.
+The station config, the BAFU client, the hourly grid with gap report (all with tests) and two data probes (BAFU and Open-Meteo) are done. The weather client, the features, the storage and the scheduled run are not built yet.
 
 ## Data
 
@@ -88,6 +88,16 @@ rows = BafuClient().fetch_stations(
 
 Run it with `uv run python`. Each row is a dict with station, timestamp, parameter, value, unit, release_state and fetched_at.
 
+Turn the raw rows into a regular hourly UTC grid and print the gap report (nothing is stored). Gaps stay missing, nothing is filled:
+
+```python
+from flowguard.features.gap_report import format_report, gap_report
+from flowguard.features.hourly_grid import build_hourly_grid
+
+result = build_hourly_grid(rows)  # result.grid is a pandas DataFrame, result.duplicates a count
+print(format_report(gap_report(result.grid, result.duplicates)))
+```
+
 No environment variables are needed yet. `.env.example` is a template for later, and `.env` is ignored by git. The feature pipeline, training, inference, the Docker image and the CI workflows do not exist yet.
 
 ## Project layout
@@ -95,7 +105,7 @@ No environment variables are needed yet. `.env.example` is a template for later,
 | Path | Content |
 | --- | --- |
 | `src/flowguard/common/` | Station list loader (`stations.py`). Shared feature code will live here |
-| `src/flowguard/features/` | BAFU GraphQL client (`bafu_client.py`) |
+| `src/flowguard/features/` | BAFU GraphQL client (`bafu_client.py`), hourly grid (`hourly_grid.py`), gap report (`gap_report.py`) |
 | `src/flowguard/training/`, `src/flowguard/inference/` | Planned, empty for now |
 | `config/` | `stations.yaml`: stations, roles, parameters and upstream mapping |
 | `scripts/` | One-off probes of the BAFU and Open-Meteo APIs |
