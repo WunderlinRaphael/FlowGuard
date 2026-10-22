@@ -16,7 +16,7 @@ The data comes from the Swiss Federal Office for the Environment (BAFU). I forec
 
 ## Status
 
-The station config, the BAFU client, the hourly grid with gap report (all with tests) and two data probes (BAFU and Open-Meteo) are done. The weather client, the features, the storage and the scheduled run are not built yet.
+The station config, the pipeline config, the BAFU client, the weather client, the hourly grid with gap report (all with tests) and two data probes (BAFU and Open-Meteo) are done. The features, the storage and the scheduled run are not built yet.
 
 ## Data
 
@@ -98,18 +98,38 @@ result = build_hourly_grid(rows)  # result.grid is a pandas DataFrame, result.du
 print(format_report(gap_report(result.grid, result.duplicates)))
 ```
 
+Fetch raw weather from Open-Meteo (no key, nothing is stored). The settings come from `config/pipeline.yaml`. `select_run` picks the forecast run that was available for the origin hour `t`, from `t` and the config only:
+
+```python
+from datetime import UTC, datetime, timedelta
+from flowguard.common.pipeline_config import load_pipeline_config
+from flowguard.features.weather_client import WeatherClient, select_run
+
+config = load_pipeline_config()
+t = datetime(2026, 10, 21, 10, tzinfo=UTC)
+run = select_run(t, as_of_offset=config.as_of_offset, min_run_age=config.min_run_age)
+
+client = WeatherClient()
+forecast = client.fetch_run(config.weather_points, run)  # 48 h run, hour 0 left out
+observed = client.fetch_observed(
+    config.weather_points, t - timedelta(hours=72), t + timedelta(hours=1)
+)
+```
+
+Each row is a dict with point, valid_time, run_start (empty for observed hours), parameter, value, unit and fetched_at.
+
 No environment variables are needed yet. `.env.example` is a template for later, and `.env` is ignored by git. The feature pipeline, training, inference, the Docker image and the CI workflows do not exist yet.
 
 ## Project layout
 
 | Path | Content |
 | --- | --- |
-| `src/flowguard/common/` | Station list loader (`stations.py`). Shared feature code will live here |
-| `src/flowguard/features/` | BAFU GraphQL client (`bafu_client.py`), hourly grid (`hourly_grid.py`), gap report (`gap_report.py`) |
+| `src/flowguard/common/` | Station list loader (`stations.py`), pipeline settings loader (`pipeline_config.py`). Shared feature code will live here |
+| `src/flowguard/features/` | BAFU GraphQL client (`bafu_client.py`), Open-Meteo weather client (`weather_client.py`), hourly grid (`hourly_grid.py`), gap report (`gap_report.py`) |
 | `src/flowguard/training/`, `src/flowguard/inference/` | Planned, empty for now |
-| `config/` | `stations.yaml`: stations, roles, parameters and upstream mapping |
+| `config/` | `stations.yaml`: stations, roles, parameters and upstream mapping. `pipeline.yaml`: start dates, as-of rule and weather points |
 | `scripts/` | One-off probes of the BAFU and Open-Meteo APIs |
-| `tests/` | Unit tests and a recorded BAFU response (`fixtures/`) |
+| `tests/` | Unit tests and recorded BAFU and Open-Meteo responses (`fixtures/`) |
 | `docs/` | `data_notes.md` with the probe results, `proposal.pdf` |
 | `notebooks/`, `ui/` | Planned, empty for now |
 | `.github/workflows/` | Planned, empty for now |
