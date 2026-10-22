@@ -177,6 +177,21 @@ At 10,000 per day the 3-point backfill fits in about two days, the 2-point backf
 - Open-Meteo's own source code is AGPLv3. That does not affect this project, because only the API is used.
 - The licence page https://open-meteo.com/en/license could not be read as plain text (it needs JavaScript). The wording above comes from the terms page and the project's GitHub page. Check the exact wording on the licence page before writing the README.
 
+### Weather points (22.10.2026)
+
+The three catchment points in `config/pipeline.yaml`. Checked with one Single Runs request for five locations (the three points plus 2491 and 2056) and the runs 2026-09-15 00Z, 2026-10-16 12Z and 2026-10-20 00Z.
+
+| Point | Requested lat / lon | Model cell (lat / lon) | Cell elevation | Precipitation sum, run 20.10. 00Z (48 h) |
+|---|---|---|---|---|
+| andermatt | 46.6423 / 8.5897 | 46.643 / 8.551 | 1447 m | 40.4 mm |
+| meiental | 46.73 / 8.47 | 46.714 / 8.419 | 2339 m | 37.6 mm |
+| schaechental | 46.88 / 8.88 | 46.924 / 8.752 | 1592 m | 27.2 mm |
+| 2491 / 2056 (for comparison) | 46.871 / 8.652 and 46.884 / 8.621 | 46.924 / 8.606 | 491 m / 441 m | 26.5 mm |
+
+- The three points fall into three different cells, and none is the Bürglen/Seedorf cell. The precipitation series differ in all three runs; only 2491 and 2056 are identical to each other.
+- The returned cell centre can be several km from the requested point (the model grid is coarse). The Meiental cell has a high elevation (2339 m), so it describes the Susten mountains more than the valley floor.
+- The Single Runs and Historical Forecast APIs return `latitude`, `longitude` and `elevation` of the cell for each location, so a change of the grid would be visible in the raw answers.
+
 ## Station coverage and approximate row counts (21.10.2026)
 
 From the BAFU `stations` query (`coverageFrom`, `coverageTo`), nothing downloaded. Rows are calculated, not counted: hours between the two dates, once per parameter listed in `config/stations.yaml`. The last two columns count from the backfill start 2011-01-01 (or from `coverageFrom` where it is later).
