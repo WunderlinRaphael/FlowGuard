@@ -1,0 +1,30 @@
+# Settings of the feature pipeline (decided 21.10.2026, see docs/data_notes.md).
+#
+# bafu_backfill_start: first day of the BAFU backfill (Phase 1 decision 09.10.2026).
+# weather_start: first day of weather data. All four ECMWF cycles (00, 06, 12, 18 UTC)
+#   exist from this day, as in the live system.
+# as_of_offset_hours: for an origin hour t the pipeline "knows" what was available at
+#   t + this many hours (the hour is complete at t + 1 h, BAFU delivers about 1.5 h later).
+# min_run_age_hours: a weather run is used only if it started at least this long before
+#   the as-of time. The delay measured on 20./21.10.2026 was 5.7 to 5.9 h.
+# weather_points: catchment points, not station points. Rain falls in the mountains, and
+#   Bürglen and Seedorf share one 9 km model cell. Every row gets the columns of all points.
+
+bafu_backfill_start: 2011-01-01
+weather_start: 2024-08-07
+as_of_offset_hours: 3
+min_run_age_hours: 7
+
+weather_points:
+  # Upper Reuss, BAFU coordinates of station 2087.
+  - name: andermatt
+    latitude: 46.6423
+    longitude: 8.5897
+  # Side valley of the ungauged middle Reuss (Meiental, Susten side).
+  - name: meiental
+    latitude: 46.73
+    longitude: 8.47
+  # Upper Schächen (Klausen, Urnerboden side).
+  - name: schaechental
+    latitude: 46.88
+    longitude: 8.88
