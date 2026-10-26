@@ -16,7 +16,7 @@ The data comes from the Swiss Federal Office for the Environment (BAFU). I forec
 
 ## Status
 
-The station config, the pipeline config, the BAFU client, the weather client, the hourly grid with gap report (all with tests) and two data probes (BAFU and Open-Meteo) are done. The features, the storage and the scheduled run are not built yet.
+The station config, the pipeline config, the BAFU client, the weather client, the hourly grid with gap report, the raw store, the backfill and the hourly ingest (all with tests) and two data probes (BAFU and Open-Meteo) are done. The features and the scheduled run are not built yet.
 
 ## Data
 
@@ -118,17 +118,33 @@ observed = client.fetch_observed(
 
 Each row is a dict with point, valid_time, run_start (empty for observed hours), parameter, value, unit and fetched_at.
 
-No environment variables are needed yet. `.env.example` is a template for later, and `.env` is ignored by git. The feature pipeline, training, inference, the Docker image and the CI workflows do not exist yet.
+Store raw data (append-only Parquet in `data/`, which git ignores). `--store` takes a local folder or, later, a `gs://` URI. Both commands need internet, no key:
+
+```bash
+uv run python -m flowguard.features.backfill --dry-run   # request counts, fetches nothing
+uv run python -m flowguard.features.backfill             # BAFU from 2011-01-01, weather runs from 07.08.2024
+uv run python -m flowguard.features.ingest               # last 48 h of BAFU, new weather runs, gap report
+```
+
+The backfill is resumable: it skips what is already stored, so after an error or a stop (Ctrl+C) run the same command again. Options: `--limit N` (at most N requests per source), `--source bafu|weather|all`, `--bafu-start` and `--weather-start` (YYYY-MM-DD, override `config/pipeline.yaml`, for small tests). The ingest can be run as often as you like: it writes only new or changed BAFU rows and weather runs that are not stored yet. Files are never overwritten:
+
+```
+data/raw/bafu/ingest_date=YYYY-MM-DD/<unit>__<fetch time>__<id>.parquet
+data/raw/weather/run_date=YYYY-MM-DD/<unit>__<fetch time>__<id>.parquet
+```
+
+No environment variables are needed yet. `.env.example` is a template for later, and `.env` is ignored by git. The feature table, training, inference, the Docker image and the CI workflows do not exist yet.
 
 ## Project layout
 
 | Path | Content |
 | --- | --- |
-| `src/flowguard/common/` | Station list loader (`stations.py`), pipeline settings loader (`pipeline_config.py`). Shared feature code will live here |
-| `src/flowguard/features/` | BAFU GraphQL client (`bafu_client.py`), Open-Meteo weather client (`weather_client.py`), hourly grid (`hourly_grid.py`), gap report (`gap_report.py`) |
+| `src/flowguard/common/` | Station list loader (`stations.py`), pipeline settings loader (`pipeline_config.py`), append-only raw store (`raw_store.py`). Shared feature code will live here |
+| `src/flowguard/features/` | BAFU GraphQL client (`bafu_client.py`), Open-Meteo weather client (`weather_client.py`), hourly grid (`hourly_grid.py`), gap report (`gap_report.py`), backfill command (`backfill.py`), hourly ingest command (`ingest.py`) |
 | `src/flowguard/training/`, `src/flowguard/inference/` | Planned, empty for now |
 | `config/` | `stations.yaml`: stations, roles, parameters and upstream mapping. `pipeline.yaml`: start dates, as-of rule and weather points |
 | `scripts/` | One-off probes of the BAFU and Open-Meteo APIs |
+| `data/` | Raw Parquet files written by the backfill and ingest, not in git |
 | `tests/` | Unit tests and recorded BAFU and Open-Meteo responses (`fixtures/`) |
 | `docs/` | `data_notes.md` with the probe results, `proposal.pdf` |
 | `notebooks/`, `ui/` | Planned, empty for now |

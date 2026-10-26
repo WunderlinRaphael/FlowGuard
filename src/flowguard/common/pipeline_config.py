@@ -1,13 +1,15 @@
 """Pipeline settings (start dates, as-of rule, weather points), loaded from config/pipeline.yaml."""
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import yaml
 
 # src/flowguard/common/pipeline_config.py -> repository root is three levels above this folder.
 CONFIG_PATH = Path(__file__).resolve().parents[3] / "config" / "pipeline.yaml"
+# The longest observed-precipitation window of the weather features.
+WEATHER_FEATURE_WINDOW = timedelta(hours=72)
 
 
 @dataclass(frozen=True)
@@ -24,6 +26,14 @@ class PipelineConfig:
     as_of_offset: timedelta
     min_run_age: timedelta
     weather_points: tuple[WeatherPoint, ...]
+
+    @property
+    def first_weather_origin(self):
+        """First origin hour whose 72 h weather window lies fully in the full-cycle period."""
+        start = datetime(
+            self.weather_start.year, self.weather_start.month, self.weather_start.day, tzinfo=UTC
+        )
+        return start + WEATHER_FEATURE_WINDOW
 
 
 def load_pipeline_config(path=CONFIG_PATH):

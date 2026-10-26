@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 import yaml
@@ -68,3 +68,13 @@ def test_longitude_out_of_range_is_rejected(tmp_path):
 def test_non_positive_hours_are_rejected(tmp_path, key):
     with pytest.raises(ValueError, match="must be positive"):
         load_pipeline_config(write_config(tmp_path, **{key: 0}))
+
+
+def test_first_weather_origin_is_weather_start_plus_72_hours():
+    config = load_pipeline_config()
+    assert config.first_weather_origin == datetime(2024, 8, 10, 0, tzinfo=UTC)
+
+
+def test_first_weather_origin_follows_weather_start(tmp_path):
+    config = load_pipeline_config(write_config(tmp_path, weather_start="2025-01-01"))
+    assert config.first_weather_origin == datetime(2025, 1, 4, 0, tzinfo=UTC)

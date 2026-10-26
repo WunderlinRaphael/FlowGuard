@@ -2,7 +2,9 @@
 #
 # bafu_backfill_start: first day of the BAFU backfill (Phase 1 decision 09.10.2026).
 # weather_start: first day of weather data. All four ECMWF cycles (00, 06, 12, 18 UTC)
-#   exist from this day, as in the live system.
+#   exist from this day, as in the live system. The weather backfill starts here, with no
+#   earlier lead. The first origin hour with weather features is this day plus 72 h
+#   (PipelineConfig.first_weather_origin).
 # as_of_offset_hours: for an origin hour t the pipeline "knows" what was available at
 #   t + this many hours (the hour is complete at t + 1 h, BAFU delivers about 1.5 h later).
 # min_run_age_hours: a weather run is used only if it started at least this long before
