@@ -16,7 +16,7 @@ The data comes from the Swiss Federal Office for the Environment (BAFU). I forec
 
 ## Status
 
-The station config, the pipeline config, the BAFU client, the weather client, the hourly grid with gap report, the raw store, the backfill and the hourly ingest (all with tests) and two data probes (BAFU and Open-Meteo) are done. The features and the scheduled run are not built yet.
+The station config, the pipeline config, the BAFU client, the weather client, the hourly grid with gap report, the raw store, the backfill and the hourly ingest (all with tests) and two data probes (BAFU and Open-Meteo) are done. The Dockerfile, the CI workflow and the manual ingest and backfill workflows are done. The features and the hourly schedule are not built yet.
 
 ## Data
 
@@ -133,7 +133,35 @@ data/raw/bafu/ingest_date=YYYY-MM-DD/<unit>__<fetch time>__<id>.parquet
 data/raw/weather/run_date=YYYY-MM-DD/<unit>__<fetch time>__<id>.parquet
 ```
 
-No environment variables are needed yet. `.env.example` is a template for later, and `.env` is ignored by git. The feature table, training, inference, the Docker image and the CI workflows do not exist yet.
+The store location comes from `--store` or, if that is not given, from the environment variable `FLOWGUARD_STORE` (a folder or a `gs://` URI), else `data/`. Copy `.env.example` to `.env` for a local value (`.env` is ignored by git).
+
+### Docker
+
+The image runs the hourly ingest by default. The backfill runs from the same image by changing the entry point:
+
+```bash
+docker build -t flowguard .
+docker run --rm -v "$PWD/data:/app/data" flowguard --store data
+docker run --rm -v "$PWD/data:/app/data" --entrypoint python flowguard -m flowguard.features.backfill --dry-run
+```
+
+### GitHub Actions
+
+| Workflow | Trigger | What it does |
+| --- | --- | --- |
+| `ci.yml` | every push and pull request | `uv sync --locked`, ruff check and format check, pytest, and a Docker build without push |
+| `ingest.yml` | manual (Actions tab, "Run workflow") | the hourly ingest into the GCS bucket |
+| `backfill.yml` | manual, input `source` = `bafu` or `weather` | the resumable backfill into the GCS bucket (timeout 5.5 h) |
+
+`ingest.yml` and `backfill.yml` need this in the repository settings (Settings > Secrets and variables > Actions):
+
+| Name | Type | Content |
+| --- | --- | --- |
+| `GCP_SA_KEY` | secret | JSON key of the service account that may write to the bucket |
+| `FLOWGUARD_STORE` | variable | bucket URI, `gs://flowguard-hs26-data` |
+| `GCP_PROJECT` | variable | Google Cloud project ID, `flowguard-hs26` |
+
+Both workflows have a concurrency group, so two runs of the same workflow never overlap. If a backfill stops (timeout or HTTP 429), start it again with the same source: it continues with the units that are not stored yet. The feature table, training and inference do not exist yet.
 
 ## Project layout
 
@@ -148,9 +176,10 @@ No environment variables are needed yet. `.env.example` is a template for later,
 | `tests/` | Unit tests and recorded BAFU and Open-Meteo responses (`fixtures/`) |
 | `docs/` | `data_notes.md` with the probe results, `proposal.pdf` |
 | `notebooks/`, `ui/` | Planned, empty for now |
-| `.github/workflows/` | Planned, empty for now |
+| `.github/workflows/` | `ci.yml`, `ingest.yml`, `backfill.yml` |
+| `Dockerfile`, `.dockerignore` | Two-stage image (python:3.12-slim, uv, non-root user), default command is the ingest |
 | `pyproject.toml`, `uv.lock` | Dependencies, pinned |
-| `.env.example` | Template for environment variables, none needed yet |
+| `.env.example` | Template for environment variables (`FLOWGUARD_STORE`) |
 
 ## Related work
 
