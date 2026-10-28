@@ -1,0 +1,29 @@
+# Only what the image needs goes into the build context: pyproject.toml, uv.lock,
+# README.md, src/ and config/. Everything else stays out.
+.git
+.github
+.venv
+.idea
+.vscode
+.mcp.json
+.DS_Store
+**/__pycache__
+.pytest_cache
+.ruff_cache
+
+# Local data, secrets and files that are not part of the code
+data
+models
+mlruns
+.env
+.env.*
+PROGRESS.md
+
+# Not needed to run the pipelines
+tests
+notebooks
+scripts
+docs
+ui
+Dockerfile
+.dockerignore
