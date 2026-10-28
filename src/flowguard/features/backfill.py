@@ -14,7 +14,7 @@ import time
 from datetime import UTC, date, datetime, timedelta
 
 from flowguard.common.pipeline_config import load_pipeline_config
-from flowguard.common.raw_store import RawStore
+from flowguard.common.raw_store import STORE_ENV, RawStore, default_store_path
 from flowguard.common.stations import load_stations
 from flowguard.features import bafu_client
 from flowguard.features.bafu_client import BafuClient, BafuError
@@ -174,7 +174,11 @@ def backfill(
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Backfill BAFU and weather data.")
-    parser.add_argument("--store", default="data", help="local folder or gs:// URI")
+    parser.add_argument(
+        "--store",
+        default=default_store_path(),
+        help=f"local folder or gs:// URI (default: ${STORE_ENV}, else data)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="print request counts only")
     parser.add_argument("--limit", type=int, help="maximum requests per source")
     parser.add_argument("--source", choices=[*SOURCES, "all"], default="all")

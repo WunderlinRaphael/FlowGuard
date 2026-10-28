@@ -14,7 +14,7 @@ from datetime import UTC, datetime, timedelta
 import pandas as pd
 
 from flowguard.common.pipeline_config import load_pipeline_config
-from flowguard.common.raw_store import RawStore
+from flowguard.common.raw_store import STORE_ENV, RawStore, default_store_path
 from flowguard.common.stations import load_stations
 from flowguard.features.backfill import RUN_STEP, floor_hour, latest_run, run_unit
 from flowguard.features.bafu_client import BafuClient, BafuError
@@ -124,7 +124,11 @@ def ingest(store, bafu, weather, stations, config, now):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Hourly ingest of BAFU and weather data.")
-    parser.add_argument("--store", default="data", help="local folder or gs:// URI")
+    parser.add_argument(
+        "--store",
+        default=default_store_path(),
+        help=f"local folder or gs:// URI (default: ${STORE_ENV}, else data)",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

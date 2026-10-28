@@ -218,3 +218,22 @@ def test_start_after_end_means_nothing_to_do(tmp_path):
     ok, _, bafu, _ = run(tmp_path, bafu_start=date(2026, 12, 1), sources=("bafu",))
     assert ok
     assert bafu.calls == []
+
+
+def test_store_comes_from_the_environment_and_the_flag_wins(monkeypatch):
+    import pytest
+
+    from flowguard.features import backfill as module
+
+    paths = []
+    monkeypatch.setattr(module, "RawStore", lambda path: paths.append(path))
+    monkeypatch.setattr(module, "BafuClient", lambda: None)
+    monkeypatch.setattr(module, "WeatherClient", lambda: None)
+    monkeypatch.setattr(module, "backfill", lambda *args, **kwargs: True)
+    for env, argv in [("gs://bucket", []), ("gs://bucket", ["--store", "other"]), (None, [])]:
+        monkeypatch.delenv("FLOWGUARD_STORE", raising=False)
+        if env:
+            monkeypatch.setenv("FLOWGUARD_STORE", env)
+        with pytest.raises(SystemExit):
+            module.main(argv)
+    assert paths == ["gs://bucket", "other", "data"]

@@ -3,6 +3,7 @@
 from datetime import UTC, datetime, timedelta
 
 import pandas as pd
+import pytest
 from helpers import make_rows
 
 from flowguard.common.pipeline_config import load_pipeline_config
@@ -166,3 +167,27 @@ def test_new_or_changed_treats_empty_values_correctly():
     stored = pd.DataFrame([row])
     assert new_or_changed([row], stored) == []
     assert new_or_changed([{**row, "value": 1.0}], stored) != []
+
+
+def run_main(monkeypatch, argv, env=None):
+    """Run the command line with the real work replaced; returns the store path it was given."""
+    from flowguard.features import ingest as module
+
+    paths = []
+    monkeypatch.setattr(module, "RawStore", lambda path: paths.append(path))
+    monkeypatch.setattr(module, "BafuClient", lambda: None)
+    monkeypatch.setattr(module, "WeatherClient", lambda: None)
+    monkeypatch.setattr(module, "ingest", lambda *args: True)
+    monkeypatch.delenv("FLOWGUARD_STORE", raising=False)
+    if env:
+        monkeypatch.setenv("FLOWGUARD_STORE", env)
+    with pytest.raises(SystemExit) as stop:
+        module.main(argv)
+    assert stop.value.code == 0
+    return paths[0]
+
+
+def test_store_comes_from_the_environment_and_the_flag_wins(monkeypatch):
+    assert run_main(monkeypatch, [], env="gs://bucket") == "gs://bucket"
+    assert run_main(monkeypatch, ["--store", "other"], env="gs://bucket") == "other"
+    assert run_main(monkeypatch, []) == "data"
