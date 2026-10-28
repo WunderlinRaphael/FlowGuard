@@ -1,0 +1,33 @@
+name: Ingest
+
+# Manual for now. The hourly schedule is added once a manual run has worked.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Runs never overlap: a second run waits for the first one to finish
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      FLOWGUARD_STORE: ${{ vars.FLOWGUARD_STORE }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.12.23"
+      - run: uv sync --locked --no-dev
+      # Writes the key to a temporary file and sets GOOGLE_APPLICATION_CREDENTIALS,
+      # which the Google Cloud Storage filesystem of pyarrow picks up.
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ vars.GCP_PROJECT }}
+      - run: uv run python -m flowguard.features.ingest
