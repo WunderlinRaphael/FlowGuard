@@ -1,0 +1,43 @@
+name: Backfill
+
+# Manual only. The command is resumable: if a run stops (timeout, HTTP 429), start it
+# again with the same source and it continues with the units that are not stored yet.
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Which data to backfill
+        type: choice
+        options:
+          - bafu
+          - weather
+        default: bafu
+
+permissions:
+  contents: read
+
+# Separate from the ingest group, so a long backfill never blocks the hourly ingest
+concurrency:
+  group: backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-24.04
+    # BAFU takes about 75 min and weather about 55 min; GitHub's limit is 6 h per job
+    timeout-minutes: 330
+    env:
+      FLOWGUARD_STORE: ${{ vars.FLOWGUARD_STORE }}
+      SOURCE: ${{ inputs.source }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.12.23"
+      - run: uv sync --locked --no-dev
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ vars.GCP_PROJECT }}
+      # The input goes through an environment variable, not into the shell line
+      - run: uv run python -m flowguard.features.backfill --source "$SOURCE"

@@ -4,10 +4,18 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
+import pyarrow.fs as pafs
 import pytest
 from helpers import FETCHED, START, make_rows
 
-from flowguard.common.raw_store import BAFU_SCHEMA, WEATHER_SCHEMA, RawStore
+from flowguard.common import raw_store
+from flowguard.common.raw_store import (
+    BAFU_SCHEMA,
+    STORE_ENV,
+    WEATHER_SCHEMA,
+    RawStore,
+    default_store_path,
+)
 
 RUN = datetime(2026, 10, 25, 6, tzinfo=UTC)
 
@@ -154,3 +162,47 @@ def test_relative_base_path_works(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     RawStore("data").write_bafu(make_rows(range(2)), "u")
     assert (tmp_path / "data" / "raw" / "bafu").is_dir()
+
+
+def test_default_store_path_comes_from_the_environment(monkeypatch):
+    monkeypatch.delenv(STORE_ENV, raising=False)
+    assert default_store_path() == "data"
+    monkeypatch.setenv(STORE_ENV, "")
+    assert default_store_path() == "data"
+    monkeypatch.setenv(STORE_ENV, "gs://flowguard-hs26-data")
+    assert default_store_path() == "gs://flowguard-hs26-data"
+
+
+@pytest.fixture
+def fake_gcs(tmp_path, monkeypatch):
+    """Stands in for GCS: from_uri hands out a local folder as the 'bucket'."""
+    seen = []
+
+    def from_uri(uri):
+        seen.append(uri)
+        return pafs.SubTreeFileSystem(str(tmp_path), pafs.LocalFileSystem()), "bucket/prefix"
+
+    monkeypatch.setattr(raw_store, "filesystem_from_uri", from_uri)
+    return seen
+
+
+def test_gs_uri_goes_through_the_filesystem_factory(tmp_path, fake_gcs):
+    store = RawStore("gs://bucket/prefix", clock=lambda: datetime(2026, 10, 1, 12, tzinfo=UTC))
+    store.write_bafu(make_rows(range(3)), "2056-w1")
+    store.write_weather(weather_rows(), "run-2026102506", RUN)
+
+    assert fake_gcs == ["gs://bucket/prefix"]
+    assert store.units("bafu") == {"2056-w1"}
+    assert store.units("weather") == {"run-2026102506"}
+    assert len(store.read_bafu()) == 3
+    assert len(store.read_weather()) == 3
+    files = sorted(str(p.relative_to(tmp_path)) for p in tmp_path.rglob("*") if p.is_file())
+    assert all(f.startswith("bucket/prefix/raw/") and f.endswith(".parquet") for f in files)
+    assert len(files) == 2
+
+
+def test_gs_store_is_append_only(tmp_path, fake_gcs):
+    store = RawStore("gs://bucket/prefix")
+    store.write_bafu(make_rows(range(2)), "unit")
+    store.write_bafu(make_rows(range(2)), "unit")
+    assert len(list(tmp_path.rglob("*.parquet"))) == 2

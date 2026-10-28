@@ -10,6 +10,7 @@ Files are never overwritten or deleted: a second write of the same unit is a new
 The base path is a local folder or a gs:// URI; only the filesystem object differs.
 """
 
+import os
 import uuid
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -48,10 +49,20 @@ WEATHER_SCHEMA = pa.schema(
 SCHEMAS = {"bafu": BAFU_SCHEMA, "weather": WEATHER_SCHEMA}
 PARTITION_KEY = {"bafu": "ingest_date", "weather": "run_date"}
 SEPARATOR = "__"
+# Where the pipelines store data when --store is not given (a folder or a gs:// URI).
+STORE_ENV = "FLOWGUARD_STORE"
 
 
 def now_utc():
     return datetime.now(UTC)
+
+
+# A module-level name so tests can replace it; the Arrow class itself cannot be patched.
+filesystem_from_uri = pafs.FileSystem.from_uri
+
+
+def default_store_path():
+    return os.environ.get(STORE_ENV) or "data"
 
 
 class RawStore:
@@ -61,7 +72,7 @@ class RawStore:
         if filesystem is not None:
             self.fs, self.root = filesystem, str(base)
         elif "://" in str(base):
-            self.fs, self.root = pafs.FileSystem.from_uri(str(base))
+            self.fs, self.root = filesystem_from_uri(str(base))
         else:
             # from_uri does not accept relative paths, so local folders are resolved here.
             self.fs, self.root = pafs.LocalFileSystem(), str(Path(base).resolve())
