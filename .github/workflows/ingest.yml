@@ -1,7 +1,10 @@
 name: Ingest
 
-# Manual for now. The hourly schedule is added once a manual run has worked.
+# Every hour at minute 17 (UTC), and by hand from the Actions tab.
+# Scheduled runs only start from the default branch.
 on:
+  schedule:
+    - cron: "17 * * * *"
   workflow_dispatch:
 
 permissions:
