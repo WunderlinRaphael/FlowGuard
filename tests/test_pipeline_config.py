@@ -5,9 +5,17 @@ import yaml
 
 from flowguard.common.cleaning import PARAMETERS, CleaningRules, rules_for
 from flowguard.common.pipeline_config import load_pipeline_config
+from flowguard.common.stations import load_stations
 
 POINT = {"name": "a", "latitude": 46.6, "longitude": 8.6}
 CLEANING = {"defaults": {"W": {"max_step": 0.5, "flat_hours": 48}}, "stations": {}}
+SPLIT = {
+    "train_end": "2026-03-15",
+    "val_start": "2026-03-15",
+    "val_end": "2026-06-15",
+    "test_start": "2026-06-15",
+    "test_end": "2026-10-01",
+}
 
 
 def write_config(tmp_path, **changes):
@@ -18,6 +26,7 @@ def write_config(tmp_path, **changes):
         "min_run_age_hours": 7,
         "weather_points": [POINT],
         "cleaning": CLEANING,
+        "split": SPLIT,
         **changes,
     }
     path = tmp_path / "pipeline.yaml"
@@ -91,6 +100,20 @@ def test_real_config_has_complete_cleaning_rules_for_every_series():
                 assert isinstance(
                     rules_for(config.cleaning, station.number, parameter), CleaningRules
                 )
+
+
+def test_real_config_split_dates():
+    split = load_pipeline_config().split
+    assert split.train_start is None
+    assert split.train_end == datetime(2026, 3, 15, tzinfo=UTC)
+    assert split.test_end == datetime(2026, 10, 1, tzinfo=UTC)
+    assert split.embargo_hours == 24
+
+
+def test_invalid_split_in_config_is_rejected(tmp_path):
+    path = write_config(tmp_path, split={**SPLIT, "val_start": "2026-01-01"})
+    with pytest.raises(ValueError, match="overlap"):
+        load_pipeline_config(path)
 
 
 def test_incomplete_cleaning_rules_are_rejected(tmp_path):

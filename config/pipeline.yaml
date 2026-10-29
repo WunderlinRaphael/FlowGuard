@@ -66,3 +66,19 @@ cleaning:
     "2299":
       W: {min: 1018.5, max: 1023.0, flat_hours: 168}
       Q: {min: -0.05, max: 100, max_step: 10, flat_hours: 336}
+
+# split: chronological segments, the same for all stations, never shuffled (common/split.py).
+#   Segments are [start, end) in UTC. train_start empty = first available origin.
+#   An origin t belongs to a segment only if t and t + embargo_hours are inside it, so the last
+#   embargo_hours of each segment are embargo. From test_end on rows are live and never used
+#   for training or selection.
+#   Provisional (29.10.2026). Frozen after the persistence analysis (step 2); never change them
+#   after a score on validation or test has been seen.
+split:
+  train_start:
+  train_end: 2026-03-15
+  val_start: 2026-03-15
+  val_end: 2026-06-15
+  test_start: 2026-06-15
+  test_end: 2026-10-01
+  embargo_hours: 24

@@ -7,6 +7,8 @@ from pathlib import Path
 import yaml
 
 from flowguard.common.cleaning import CleaningConfig, parse_cleaning_config
+from flowguard.common.split import SplitConfig, parse_split_config
+
 # src/flowguard/common/pipeline_config.py -> repository root is three levels above this folder.
 CONFIG_PATH = Path(__file__).resolve().parents[3] / "config" / "pipeline.yaml"
 # The longest observed-precipitation window of the weather features.
@@ -28,6 +30,7 @@ class PipelineConfig:
     min_run_age: timedelta
     weather_points: tuple[WeatherPoint, ...]
     cleaning: CleaningConfig
+    split: SplitConfig
 
     @property
     def first_weather_origin(self):
@@ -52,6 +55,7 @@ def load_pipeline_config(path=CONFIG_PATH):
             for p in raw["weather_points"]
         ),
         cleaning=parse_cleaning_config(raw["cleaning"]),
+        split=parse_split_config(raw["split"]),
     )
     validate(config)
     return config

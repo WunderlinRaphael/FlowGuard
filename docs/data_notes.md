@@ -239,3 +239,7 @@ Observed, per series (W in m a.s.l., Q in m3/s):
 Result of the checks over the whole history (hours flagged): no range and no flat flags in any series; spikes: 2056 Q 2, 2056 W 1, 2087 Q 1, 2299 Q 1, 2299 W 1, 2491 Q 2, all others 0. So on history the checks fire only on a handful of extreme values. They are a safety net for live data (a sensor stuck for days, an impossible reading), not a tool that reshapes the training data.
 
 Not covered: WT at Seedorf (stored raw, not a feature). Missing hours (2299 about 1,800, 2087 Q 42) are gaps from BAFU and are reported by the gap report, not by the cleaning.
+
+## Split dates (29.10.2026, provisional)
+
+`split` section of `config/pipeline.yaml`: train until 2026-03-15, validation 2026-03-15 to 2026-06-15, test 2026-06-15 to 2026-10-01, UTC, embargo 24 h. Rows from 2026-10-01 on are live. The dates stay provisional until the persistence analysis (step 2) shows that every segment has events; after that they are frozen.
