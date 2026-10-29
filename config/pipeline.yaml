@@ -30,3 +30,39 @@ weather_points:
   - name: schaechental
     latitude: 46.88
     longitude: 8.88
+
+# cleaning: range, spike and flat-line checks (common/cleaning.py). Provisional (29.10.2026),
+#   derived from the 2011 to 2026 backfill, reasons per station in docs/data_notes.md.
+#   Checks flag a value, a flagged value becomes missing in the cleaned series; raw is untouched.
+#   min / max: physical limits. W is in m a.s.l., Q in m3/s. Set per station (levels differ).
+#   max_step: a jump larger than this that is back within max_step / 2 after at most 2 h is a
+#     spike. A lasting step is a real change. W in m, Q in m3/s.
+#   flat_hours: this many identical hours in a row count as a stuck sensor. null = off.
+# defaults apply to every station; stations overrides them per parameter, field by field.
+cleaning:
+  defaults:
+    W: {max_step: 0.5, flat_hours: 48}
+    Q: {max_step: 50, flat_hours: 48}
+  stations:
+    # Andermatt: the defaults fit (longest natural flat run 20 h).
+    "2087":
+      W: {min: 1425.5, max: 1431.0}
+      Q: {min: -0.05, max: 500}
+    # Bürglen: W stays on one value for days at low flow (1 mm resolution).
+    "2491":
+      W: {min: 484.5, max: 488.0, flat_hours: 336}
+      Q: {min: -0.05, max: 100, max_step: 10, flat_hours: 168}
+    # Seedorf: hydropeaking gives big natural hourly steps, so the default steps stay wide.
+    "2056":
+      W: {min: 435.8, max: 443.0}
+      Q: {min: -0.05, max: 800}
+    # EW Altdorf diversion: constant or zero for weeks is normal, so no flat-line check.
+    "2492":
+      Q: {min: -0.05, max: 3, max_step: 3, flat_hours: null}
+    # KW Schächen diversion: slightly negative values are measurement noise and stay.
+    "2649":
+      Q: {min: -0.05, max: 15, max_step: 5, flat_hours: 336}
+    # Erstfeld (observe only).
+    "2299":
+      W: {min: 1018.5, max: 1023.0, flat_hours: 168}
+      Q: {min: -0.05, max: 100, max_step: 10, flat_hours: 336}
