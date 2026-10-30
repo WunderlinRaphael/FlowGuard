@@ -89,20 +89,33 @@ def parse_cleaning_config(raw):
     return config
 
 
-def clean_series(series, rules):
+def clean_series(series, rules, causal=False):
     """Check one series on the regular hourly grid; returns CleanResult(values, flags).
 
     series: float Series with a UTC hourly DatetimeIndex (a missing hour is NaN).
     flags: "ok", "range", "spike", "flat" or "missing" per hour. Order of precedence:
     range, spike, flat. Flagged values are NaN in `values`.
+
+    causal=False looks at the whole series: a spike needs the hours after it, and a flat run
+    is flagged from its first hour once it is long enough. Use it for the run report and for
+    labels. causal=True only looks backwards, so the flag of an hour never depends on later
+    hours and a flag never changes when more data arrives. Range works as before, there is no
+    spike check, and the flat check is trailing: an hour is flagged only if it and the
+    previous flat_hours - 1 hours are valid and identical, so flags start with the hour that
+    completes the run. Use it for features, where the value at t must not depend on the
+    future (training and the live system then see the same value).
     """
     check_hourly_index(series.index)
     x = series.astype("float64")
     valid = x.notna()
 
     out_of_range = valid & ((x < rules.min) | (x > rules.max))
-    spike = _spikes(x, rules.max_step) & ~out_of_range
-    flat = _flat_lines(x, rules.flat_hours) & ~out_of_range & ~spike
+    if causal:
+        spike = pd.Series(False, index=x.index)
+        flat = _trailing_flat_lines(x, rules.flat_hours) & ~out_of_range
+    else:
+        spike = _spikes(x, rules.max_step) & ~out_of_range
+        flat = _flat_lines(x, rules.flat_hours) & ~out_of_range & ~spike
 
     flags = pd.Series(OK, index=x.index, dtype="object")
     flags[~valid] = MISSING
@@ -164,3 +177,13 @@ def _flat_lines(x, flat_hours):
     group = (x != x.shift()).cumsum()
     size = x.groupby(group).transform("size")
     return x.notna() & (size >= flat_hours)
+
+
+def _trailing_flat_lines(x, flat_hours):
+    """Hours that complete a run of flat_hours identical valid values (and the hours after it)."""
+    if flat_hours is None:
+        return pd.Series(False, index=x.index)
+    group = (x != x.shift()).cumsum()
+    # Position of the hour inside its run of identical values, counted from 1.
+    position = x.groupby(group).cumcount() + 1
+    return x.notna() & (position >= flat_hours)

@@ -190,3 +190,57 @@ def test_invalid_rules_raise(raw, message):
 def test_unknown_parameter_in_config_raises():
     with pytest.raises(ValueError, match="unknown parameter"):
         parse_cleaning_config({"defaults": {"WT": {}}, "stations": {}})
+
+
+# causal mode: the flag of an hour never depends on later hours
+
+
+def causal_flags(values, rules=RULES):
+    return list(clean_series(series(values), rules, causal=True).flags)
+
+
+def test_causal_mode_does_not_mask_a_spike():
+    result = clean_series(series([20, 20, 60, 20, 20]), RULES, causal=True)
+    assert list(result.flags) == ["ok"] * 5
+    assert list(result.values) == [20, 20, 60, 20, 20]
+
+
+def test_causal_mode_still_flags_the_range():
+    assert causal_flags([1, 150, 2, -5, 3]) == ["ok", "range", "ok", "range", "ok"]
+
+
+def test_causal_flat_run_is_flagged_from_the_completing_hour():
+    # flat_hours is 5: hours 0 to 3 stay ok, the fifth identical hour and later ones are flat.
+    flags = causal_flags([1, 7, 7, 7, 7, 7, 7, 2])
+    assert flags == ["ok", "ok", "ok", "ok", "ok", "flat", "flat", "ok"]
+
+
+def test_causal_flat_run_shorter_than_flat_hours_is_not_flagged():
+    assert causal_flags([7, 7, 7, 7, 8]) == ["ok"] * 5
+
+
+def test_causal_flat_run_is_cut_by_a_missing_hour():
+    flags = causal_flags([7, 7, 7, np.nan, 7, 7, 7])
+    assert flags == ["ok", "ok", "ok", "missing", "ok", "ok", "ok"]
+
+
+def test_causal_flat_check_can_be_switched_off():
+    rules = CleaningRules(min=0.0, max=100.0, max_step=10.0, flat_hours=None)
+    assert causal_flags([7] * 10, rules) == ["ok"] * 10
+
+
+def test_causal_range_wins_over_flat():
+    assert causal_flags([150] * 6) == ["range"] * 6
+
+
+def test_causal_flags_of_an_hour_are_the_same_on_a_series_cut_at_that_hour():
+    values = [20, 20, 60, 20, 5, 5, 5, 5, 5, 5, 5, 30, 31, 150, 30, 30]
+    full = clean_series(series(values), RULES, causal=True)
+    for t in range(len(values)):
+        cut = clean_series(series(values[: t + 1]), RULES, causal=True)
+        assert cut.flags.iloc[t] == full.flags.iloc[t]
+        assert list(cut.flags) == list(full.flags.iloc[: t + 1])
+
+
+def test_default_is_not_causal():
+    assert clean_series(series([20, 20, 60, 20, 20]), RULES).flags.iloc[2] == "spike"
