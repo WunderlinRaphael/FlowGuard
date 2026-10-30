@@ -243,3 +243,31 @@ Not covered: WT at Seedorf (stored raw, not a feature). Missing hours (2299 abou
 ## Split dates (29.10.2026, provisional)
 
 `split` section of `config/pipeline.yaml`: train until 2026-03-15, validation 2026-03-15 to 2026-06-15, test 2026-06-15 to 2026-10-01, UTC, embargo 24 h. Rows from 2026-10-01 on are live. The dates stay provisional until the persistence analysis (step 2) shows that every segment has events; after that they are frozen.
+
+## Weather runs Open-Meteo does not have (30.10.2026)
+
+The weather backfill (every 6 h from 2024-08-07 00Z) skipped 11 runs with a warning because the Single Runs API answers "requested model run is not available". Found by comparing the expected run list with the stored units (`scripts/eda_baseline.py`, section "Weather runs not in the store" of `docs/eda_notes.md`):
+
+| Date | Missing run starts (UTC) |
+|---|---|
+| 2024-08-08 | 06Z |
+| 2024-08-09 | 06Z |
+| 2025-08-04 | 18Z |
+| 2025-08-05 | 00Z, 06Z |
+| 2025-08-06 | 00Z |
+| 2025-08-07 | 18Z |
+| 2025-08-08 | 00Z, 12Z |
+| 2025-08-09 | 00Z |
+| 2026-06-10 | 12Z |
+
+The runs of 2025-08-04 to 2025-08-09 are a cluster of 8 missing runs in one week. How the composite weather series and the run rule handle a missing run is decided in step 4 (weather features); nothing is filled in the raw store.
+
+## Fallback sources (not probed)
+
+If the BAFU GraphQL API fails or changes, these are the other ways to the same data. None of them was tested for this project:
+
+- hydrodaten.admin.ch: the public BAFU website for the same stations, with current values and downloads per station.
+- existenz.ch: a third-party JSON API that republishes the BAFU hydrology data.
+- BAFU monthly bulk files: downloads of the validated data per month. Possible source for the backfill from 2011, not used (decision 09.10.2026: backfill through the API).
+
+Details (URLs, formats, update delay, licence) are to be checked before one of them is needed.
