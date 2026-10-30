@@ -16,7 +16,7 @@ The data comes from the Swiss Federal Office for the Environment (BAFU). I forec
 
 ## Status
 
-The station config, the pipeline config, the BAFU client, the weather client, the hourly grid with gap report, the raw store, the backfill and the hourly ingest (all with tests) and two data probes (BAFU and Open-Meteo) are done. The Dockerfile, the CI workflow and the manual ingest and backfill workflows are done. The features and the hourly schedule are not built yet.
+The station config, the pipeline config, the BAFU client, the weather client, the hourly grid with gap report, the raw store, the backfill, the hourly ingest, the cleaning checks and the chronological split (all with tests) and two data probes (BAFU and Open-Meteo) are done. The Dockerfile, the CI workflow and the manual ingest and backfill workflows are done. The hourly ingest runs on a schedule. The feature table is not built yet.
 
 ## Data
 
@@ -167,10 +167,10 @@ Both workflows have a concurrency group, so two runs of the same workflow never 
 
 | Path | Content |
 | --- | --- |
-| `src/flowguard/common/` | Station list loader (`stations.py`), pipeline settings loader (`pipeline_config.py`), append-only raw store (`raw_store.py`). Shared feature code will live here |
+| `src/flowguard/common/` | Station list loader (`stations.py`), pipeline settings loader (`pipeline_config.py`), append-only raw store (`raw_store.py`), range, spike and flat-line checks (`cleaning.py`), chronological split with embargo (`split.py`). Shared feature code will live here |
 | `src/flowguard/features/` | BAFU GraphQL client (`bafu_client.py`), Open-Meteo weather client (`weather_client.py`), hourly grid (`hourly_grid.py`), gap report (`gap_report.py`), backfill command (`backfill.py`), hourly ingest command (`ingest.py`) |
 | `src/flowguard/training/`, `src/flowguard/inference/` | Planned, empty for now |
-| `config/` | `stations.yaml`: stations, roles, parameters and upstream mapping. `pipeline.yaml`: start dates, as-of rule and weather points |
+| `config/` | `stations.yaml`: stations, roles, parameters and upstream mapping. `pipeline.yaml`: start dates, as-of rule, weather points, cleaning thresholds and split dates |
 | `scripts/` | One-off probes of the BAFU and Open-Meteo APIs |
 | `data/` | Raw Parquet files written by the backfill and ingest, not in git |
 | `tests/` | Unit tests and recorded BAFU and Open-Meteo responses (`fixtures/`) |

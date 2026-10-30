@@ -210,3 +210,36 @@ From the BAFU `stations` query (`coverageFrom`, `coverageTo`), nothing downloade
 - Coverage exists only per station, not per parameter. An upper bound: W or WT may start later than Q, hourly means may start later than the station, and holes are not subtracted (2299, for example, has gaps and is days late).
 - `coverageTo` is the date of the query for all six stations, so it is metadata and not the age of the newest value (see the 7-day check above).
 - 2649 only exists since 2020-01-01. Its history before 2011 does not matter, but it has only about 6.8 years of data for the pooled model.
+
+## Cleaning thresholds (29.10.2026, provisional)
+
+Source: the full local backfill (1.46 million raw rows, 2011-01-01 to 2026-10-28, grid built with `build_hourly_grid`). The thresholds live in the `cleaning` section of `config/pipeline.yaml` and are applied by `common/cleaning.py`. They stay provisional until the feature schema v1 is frozen; a change of any threshold means a new feature version.
+
+The checks only flag. A flagged value becomes missing in the cleaned series, the raw store is not touched. Order: range, then spike, then flat line.
+
+- Range: `min` and `max` per station, observed extremes plus a wide margin. W is in m a.s.l., so the limits differ per station.
+- Spike: a run of at most 2 hours that differs from the hour before by more than `max_step` and is back within `max_step / 2` of it right after. A lasting step is a real change and is not flagged.
+- Flat line: `flat_hours` identical hours in a row. A missing hour ends the run.
+
+Observed, per series (W in m a.s.l., Q in m3/s):
+
+| Series | Observed range | Longest identical run (hours) | Chosen rules | Reason |
+|---|---|---|---|---|
+| 2087 W | 1426.45 to 1429.67 | 20 | 1425.5 to 1431.0, step 0.5, flat 48 | Margin of about 1 m; default step and flat |
+| 2087 Q | 0.74 to 343.9 | 18 | -0.05 to 500, step 50, flat 48 | Maximum about 1.5 times the observed one |
+| 2491 W | 485.46 to 486.64 | 232 | 484.5 to 488.0, step 0.5, flat 336 | At low flow W stays on one value for days (1 mm resolution), so flat is relaxed |
+| 2491 Q | 0.21 to 54.0 | 57 | -0.05 to 100, step 10, flat 168 | Largest hourly change 13.5; a step of 10 that returns happened twice |
+| 2056 W | 436.81 to 441.51 | 7 | 435.8 to 443.0, step 0.5, flat 48 | Hydropeaking: hourly changes up to 0.90 m are real, so the step stays wide |
+| 2056 Q | 3.2 to 569.7 | 6 | -0.05 to 800, step 50, flat 48 | Hourly changes up to 134 m3/s; only jumps of 50 or more that return are spikes |
+| 2492 Q | -0.001 to 0.98 | 694 | -0.05 to 3, step 3, flat off | The diversion is zero or constant for weeks, so a flat line says nothing |
+| 2649 Q | -0.013 to 7.36 | 135 | -0.05 to 15, step 5, flat 336 | 1,468 hours are slightly negative (measurement noise); they stay |
+| 2299 W | 1019.34 to 1021.74 | 117 | 1018.5 to 1023.0, step 0.5, flat 168 | Observe only |
+| 2299 Q | 0.036 to 47.9 | 110 | -0.05 to 100, step 10, flat 336 | Observe only |
+
+Result of the checks over the whole history (hours flagged): no range and no flat flags in any series; spikes: 2056 Q 2, 2056 W 1, 2087 Q 1, 2299 Q 1, 2299 W 1, 2491 Q 2, all others 0. So on history the checks fire only on a handful of extreme values. They are a safety net for live data (a sensor stuck for days, an impossible reading), not a tool that reshapes the training data.
+
+Not covered: WT at Seedorf (stored raw, not a feature). Missing hours (2299 about 1,800, 2087 Q 42) are gaps from BAFU and are reported by the gap report, not by the cleaning.
+
+## Split dates (29.10.2026, provisional)
+
+`split` section of `config/pipeline.yaml`: train until 2026-03-15, validation 2026-03-15 to 2026-06-15, test 2026-06-15 to 2026-10-01, UTC, embargo 24 h. Rows from 2026-10-01 on are live. The dates stay provisional until the persistence analysis (step 2) shows that every segment has events; after that they are frozen.
