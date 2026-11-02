@@ -109,6 +109,7 @@ uv run python -m flowguard.features.build --store <folder or gs://...> --since 2
 - `--since D` rebuilds the months from the month of `D` onward. Raw data is read from 22 days before the start of that month: 7 days for the longest lag, plus the longest flat-line window of the cleaning config (336 h = 14 days), plus one day. The value is derived from the config (`build.lookback`), so a longer flat window extends it. The rebuilt rows are byte-identical to the same rows of a full build (tested).
 - The content of the table depends only on the raw data, never on the clock. Only `built_at` in the manifest does.
 - GitHub Actions: workflow `Features` (manual, optional `since` input).
+- Hourly build: after each ingest, the job `features` of `ingest.yml` runs `build --since <first day of the previous month>`, computed in the shell (UTC). So the current and the previous month are rebuilt, from raw data read 22 days before that start. This catches late BAFU values and the newest weather runs within the hour. Month files whose bytes did not change are not rewritten, so most runs write only the current month. Older months change only through a manual full build.
 
 ## Manifest
 
