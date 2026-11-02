@@ -16,7 +16,7 @@ The data comes from the Swiss Federal Office for the Environment (BAFU). I forec
 
 ## Status
 
-The station config, the pipeline config, the BAFU client, the weather client, the hourly grid with gap report, the raw store, the backfill, the hourly ingest, the cleaning checks and the chronological split (all with tests) and two data probes (BAFU and Open-Meteo) are done. The Dockerfile, the CI workflow and the manual ingest and backfill workflows are done. The hourly ingest runs on a schedule. The feature table is built from the raw store (`flowguard.features.build`, with a manifest) locally or into the bucket by a manual workflow; building it on the schedule, training and inference do not exist yet.
+The station config, the pipeline config, the BAFU client, the weather client, the hourly grid with gap report, the raw store, the backfill, the hourly ingest, the cleaning checks and the chronological split (all with tests) and two data probes (BAFU and Open-Meteo) are done. The Dockerfile, the CI workflow and the manual ingest and backfill workflows are done. The hourly ingest runs on a schedule. The feature table is built from the raw store (`flowguard.features.build`, with a manifest) locally or into the bucket by a manual workflow; it is also built on the schedule, as a second job after each hourly ingest. Training and inference do not exist yet.
 
 ## Data
 
@@ -164,7 +164,7 @@ docker run --rm -v "$PWD/data:/app/data" --entrypoint python flowguard -m flowgu
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
 | `ci.yml` | every push and pull request | `uv sync --locked`, ruff check and format check, pytest, and a Docker build without push |
-| `ingest.yml` | every hour at minute 17 (UTC) and manual | the hourly ingest into the GCS bucket |
+| `ingest.yml` | every hour at minute 17 (UTC) and manual | job `ingest`: the hourly ingest into the GCS bucket. Job `features` (after `ingest`, timeout 15 min): incremental feature build from the first day of the previous month on, into `features/v1/` |
 | `backfill.yml` | manual, input `source` = `bafu` or `weather` | the resumable backfill into the GCS bucket (timeout 5.5 h) |
 | `features.yml` | manual, optional input `since` (YYYY-MM-DD) | builds the feature table from the raw data in the bucket and writes it to `features/v1/` (timeout 30 min) |
 
@@ -175,6 +175,8 @@ docker run --rm -v "$PWD/data:/app/data" --entrypoint python flowguard -m flowgu
 | `GCP_SA_KEY` | secret | JSON key of the service account that may write to the bucket |
 | `FLOWGUARD_STORE` | variable | bucket URI, `gs://flowguard-hs26-data` |
 | `GCP_PROJECT` | variable | Google Cloud project ID, `flowguard-hs26` |
+
+The `features` job of `ingest.yml` is a separate job, so a failing build never turns the `ingest` job red or stops the data collection. It shares the concurrency group `features` with `features.yml` (a manual full build and the hourly build never write at the same time; a running build is never cancelled). It prints the build report to the log and to the job summary. The runner keeps nothing, everything goes to the bucket.
 
 Every workflow has its own concurrency group, so two runs of the same workflow never overlap. If a backfill stops (timeout or HTTP 429), start it again with the same source: it continues with the units that are not stored yet.
 
