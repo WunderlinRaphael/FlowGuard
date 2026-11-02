@@ -16,7 +16,7 @@ The data comes from the Swiss Federal Office for the Environment (BAFU). I forec
 
 ## Status
 
-The station config, the pipeline config, the BAFU client, the weather client, the hourly grid with gap report, the raw store, the backfill, the hourly ingest, the cleaning checks and the chronological split (all with tests) and two data probes (BAFU and Open-Meteo) are done. The Dockerfile, the CI workflow and the manual ingest and backfill workflows are done. The hourly ingest runs on a schedule. The feature table is not built yet.
+The station config, the pipeline config, the BAFU client, the weather client, the hourly grid with gap report, the raw store, the backfill, the hourly ingest, the cleaning checks and the chronological split (all with tests) and two data probes (BAFU and Open-Meteo) are done. The Dockerfile, the CI workflow and the manual ingest and backfill workflows are done. The hourly ingest runs on a schedule. The feature table is built from the raw store (`flowguard.features.build`, with a manifest) locally or into the bucket by a manual workflow; building it on the schedule, training and inference do not exist yet.
 
 ## Data
 
@@ -135,6 +135,20 @@ data/raw/weather/run_date=YYYY-MM-DD/<unit>__<fetch time>__<id>.parquet
 
 The store location comes from `--store` or, if that is not given, from the environment variable `FLOWGUARD_STORE` (a folder or a `gs://` URI), else `data/`. Copy `.env.example` to `.env` for a local value (`.env` is ignored by git).
 
+Build the feature table from the raw store (see `docs/features.md`). `--store` and `FLOWGUARD_STORE` work as above:
+
+```bash
+uv run python -m flowguard.features.build                      # full build (about 25 s for the local history)
+uv run python -m flowguard.features.build --since 2026-10-01   # only the months from October 2026 on
+```
+
+The table is written as one Parquet file per station and month, plus a manifest that records the feature version, build time, commit, newest raw `fetched_at`, rows per station and the cleaning flag counts. A month file is only rewritten if its content changed:
+
+```
+data/features/v1/station=<number>/month=<YYYY-MM>/features.parquet
+data/features/v1/_manifest.json
+```
+
 ### Docker
 
 The image runs the hourly ingest by default. The backfill runs from the same image by changing the entry point:
@@ -150,10 +164,11 @@ docker run --rm -v "$PWD/data:/app/data" --entrypoint python flowguard -m flowgu
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
 | `ci.yml` | every push and pull request | `uv sync --locked`, ruff check and format check, pytest, and a Docker build without push |
-| `ingest.yml` | manual (Actions tab, "Run workflow") | the hourly ingest into the GCS bucket |
+| `ingest.yml` | every hour at minute 17 (UTC) and manual | the hourly ingest into the GCS bucket |
 | `backfill.yml` | manual, input `source` = `bafu` or `weather` | the resumable backfill into the GCS bucket (timeout 5.5 h) |
+| `features.yml` | manual, optional input `since` (YYYY-MM-DD) | builds the feature table from the raw data in the bucket and writes it to `features/v1/` (timeout 30 min) |
 
-`ingest.yml` and `backfill.yml` need this in the repository settings (Settings > Secrets and variables > Actions):
+`ingest.yml`, `backfill.yml` and `features.yml` need this in the repository settings (Settings > Secrets and variables > Actions):
 
 | Name | Type | Content |
 | --- | --- | --- |
@@ -161,22 +176,22 @@ docker run --rm -v "$PWD/data:/app/data" --entrypoint python flowguard -m flowgu
 | `FLOWGUARD_STORE` | variable | bucket URI, `gs://flowguard-hs26-data` |
 | `GCP_PROJECT` | variable | Google Cloud project ID, `flowguard-hs26` |
 
-Both workflows have a concurrency group, so two runs of the same workflow never overlap. If a backfill stops (timeout or HTTP 429), start it again with the same source: it continues with the units that are not stored yet. The feature table, training and inference do not exist yet.
+Every workflow has its own concurrency group, so two runs of the same workflow never overlap. If a backfill stops (timeout or HTTP 429), start it again with the same source: it continues with the units that are not stored yet.
 
 ## Project layout
 
 | Path | Content |
 | --- | --- |
-| `src/flowguard/common/` | Station list loader (`stations.py`), pipeline settings loader (`pipeline_config.py`), append-only raw store (`raw_store.py`), range, spike and flat-line checks with a causal mode for features (`cleaning.py`), chronological split with embargo (`split.py`), lag and rolling features per target station (`features.py`, W and Q of the station, its upstream slots and the diversion flows, plus the 24 h target), weather composite series and weather features per catchment point from the stored model runs (`weather_features.py`) |
-| `src/flowguard/features/` | BAFU GraphQL client (`bafu_client.py`), Open-Meteo weather client (`weather_client.py`), hourly grid (`hourly_grid.py`), gap report (`gap_report.py`), backfill command (`backfill.py`), hourly ingest command (`ingest.py`) |
+| `src/flowguard/common/` | Station list loader (`stations.py`), pipeline settings loader (`pipeline_config.py`), append-only raw store (`raw_store.py`), range, spike and flat-line checks with a causal mode for features (`cleaning.py`), chronological split with embargo (`split.py`), lag and rolling features per target station (`features.py`, W and Q of the station, its upstream slots and the diversion flows, plus the 24 h target), weather composite series and weather features per catchment point from the stored model runs (`weather_features.py`), the joined feature table (`feature_table.py`) |
+| `src/flowguard/features/` | BAFU GraphQL client (`bafu_client.py`), Open-Meteo weather client (`weather_client.py`), hourly grid (`hourly_grid.py`), gap report (`gap_report.py`), backfill command (`backfill.py`), hourly ingest command (`ingest.py`), feature table storage and manifest (`feature_store.py`), feature build command (`build.py`) |
 | `src/flowguard/training/`, `src/flowguard/inference/` | Planned, empty for now |
 | `config/` | `stations.yaml`: stations, roles, parameters and upstream mapping. `pipeline.yaml`: start dates, as-of rule, weather points, cleaning thresholds and split dates |
 | `scripts/` | One-off probes of the BAFU and Open-Meteo APIs |
-| `data/` | Raw Parquet files written by the backfill and ingest, not in git |
+| `data/` | Raw Parquet files (`raw/`) written by the backfill and ingest and the feature table (`features/`), not in git |
 | `tests/` | Unit tests and recorded BAFU and Open-Meteo responses (`fixtures/`) |
-| `docs/` | `data_notes.md` with the probe results, `proposal.pdf` |
+| `docs/` | `data_notes.md` with the probe results, `features.md` (feature catalogue, storage, versioning), `eda_notes.md`, `proposal.pdf` |
 | `notebooks/`, `ui/` | Planned, empty for now |
-| `.github/workflows/` | `ci.yml`, `ingest.yml`, `backfill.yml` |
+| `.github/workflows/` | `ci.yml`, `ingest.yml`, `backfill.yml`, `features.yml` |
 | `Dockerfile`, `.dockerignore` | Two-stage image (python:3.12-slim, uv, non-root user), default command is the ingest |
 | `pyproject.toml`, `uv.lock` | Dependencies, pinned |
 | `.env.example` | Template for environment variables (`FLOWGUARD_STORE`) |

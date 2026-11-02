@@ -1,5 +1,6 @@
 """Pipeline settings (start dates, as-of rule, weather points), loaded from config/pipeline.yaml."""
 
+import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -31,6 +32,8 @@ class PipelineConfig:
     weather_points: tuple[WeatherPoint, ...]
     cleaning: CleaningConfig
     split: SplitConfig
+    # Schema version of the stored feature table (features/<feature_version>/ in the store).
+    feature_version: str
 
     @property
     def first_weather_origin(self):
@@ -56,6 +59,7 @@ def load_pipeline_config(path=CONFIG_PATH):
         ),
         cleaning=parse_cleaning_config(raw["cleaning"]),
         split=parse_split_config(raw["split"]),
+        feature_version=str(raw["feature_version"]),
     )
     validate(config)
     return config
@@ -67,6 +71,8 @@ def validate(config):
         raise ValueError("as_of_offset_hours must be positive")
     if config.min_run_age <= timedelta(0):
         raise ValueError("min_run_age_hours must be positive")
+    if not re.fullmatch(r"v\d+", config.feature_version):
+        raise ValueError(f"feature_version must look like v1, got {config.feature_version!r}")
     if not config.weather_points:
         raise ValueError("At least one weather point is needed")
 

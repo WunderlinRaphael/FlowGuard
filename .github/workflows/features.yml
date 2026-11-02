@@ -1,0 +1,42 @@
+name: Features
+
+# By hand from the Actions tab. Without "since" the whole feature table is rebuilt from the
+# raw store; with a date (YYYY-MM-DD) the months from the month of that date onward.
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "Rebuild the months from this date on (YYYY-MM-DD). Empty = full build."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+# Runs never overlap: a second run waits for the first one to finish
+concurrency:
+  group: features
+  cancel-in-progress: false
+
+jobs:
+  features:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      FLOWGUARD_STORE: ${{ vars.FLOWGUARD_STORE }}
+      # Passed as an environment variable so the input is never part of the shell command.
+      SINCE: ${{ inputs.since }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.12.23"
+      - run: uv sync --locked --no-dev
+      # Writes the key to a temporary file and sets GOOGLE_APPLICATION_CREDENTIALS,
+      # which the Google Cloud Storage filesystem of pyarrow picks up.
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ vars.GCP_PROJECT }}
+      # GITHUB_SHA is set by Actions and ends up as code_version in the manifest.
+      - run: uv run python -m flowguard.features.build ${SINCE:+--since "$SINCE"}

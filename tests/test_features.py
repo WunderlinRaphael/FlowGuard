@@ -414,3 +414,23 @@ def test_empty_grid_gives_an_empty_table_with_all_columns(stations, cleaning):
     table = build_features(empty, stations, cleaning)
     assert table.empty
     assert list(table.columns) == table_columns(stations)
+
+
+def test_rolling_values_do_not_depend_on_where_the_series_starts(stations, cleaning):
+    # A late start of the series must not change a window by rounding noise: an incremental
+    # build reads less history than a full build and still has to give the same rows.
+    values = make_values()
+    for array in values.values():
+        array += 1000.0  # big levels make rounding errors visible
+    full = build(values, stations, cleaning)
+    late_grid = make_grid(values)
+    late_grid = late_grid[late_grid["timestamp"] >= pd.Timestamp(START + timedelta(hours=100))]
+    short = build_features(late_grid, stations, cleaning)
+
+    columns = [c for c in feature_columns(stations) if "_roll" in c]
+    for station in ("2087", "2491", "2056"):
+        a = full[(full["station_id"] == station) & (full["t"] >= short["t"].min())]
+        b = short[short["station_id"] == station]
+        pd.testing.assert_frame_equal(
+            a[columns].reset_index(drop=True), b[columns].reset_index(drop=True), rtol=0, atol=0
+        )

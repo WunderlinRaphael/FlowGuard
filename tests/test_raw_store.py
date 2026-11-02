@@ -206,3 +206,14 @@ def test_gs_store_is_append_only(tmp_path, fake_gcs):
     store.write_bafu(make_rows(range(2)), "unit")
     store.write_bafu(make_rows(range(2)), "unit")
     assert len(list(tmp_path.rglob("*.parquet"))) == 2
+
+
+def test_read_weather_can_skip_older_run_dates(tmp_path):
+    store = store_at(tmp_path)
+    old, new = datetime(2026, 10, 20, 6, tzinfo=UTC), datetime(2026, 10, 25, 6, tzinfo=UTC)
+    store.write_weather(weather_rows(old), "run-old", old)
+    store.write_weather(weather_rows(new), "run-new", new)
+
+    assert len(store.read_weather()) == 6
+    recent = store.read_weather(from_run_date=new.date())
+    assert len(recent) == 3 and set(recent["run_start"]) == {pd.Timestamp(new)}

@@ -27,6 +27,7 @@ def write_config(tmp_path, **changes):
         "weather_points": [POINT],
         "cleaning": CLEANING,
         "split": SPLIT,
+        "feature_version": "v1",
         **changes,
     }
     path = tmp_path / "pipeline.yaml"
@@ -120,3 +121,21 @@ def test_incomplete_cleaning_rules_are_rejected(tmp_path):
     cleaning = {"defaults": {}, "stations": {"2087": {"W": {"min": 1.0, "max": 2.0}}}}
     with pytest.raises(ValueError, match="missing keys"):
         load_pipeline_config(write_config(tmp_path, cleaning=cleaning))
+
+
+def test_feature_version_is_loaded():
+    assert load_pipeline_config().feature_version == "v1"
+
+
+def test_feature_version_is_required(tmp_path):
+    path = write_config(tmp_path)
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    del raw["feature_version"]
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    with pytest.raises(KeyError):
+        load_pipeline_config(path)
+
+
+def test_feature_version_must_look_like_v1(tmp_path):
+    with pytest.raises(ValueError, match="feature_version"):
+        load_pipeline_config(write_config(tmp_path, feature_version="1.0"))

@@ -12,6 +12,11 @@
 # weather_points: catchment points, not station points. Rain falls in the mountains, and
 #   Bürglen and Seedorf share one 9 km model cell. Every row gets the columns of all points.
 
+# feature_version: schema version of the stored feature table (features/<version>/). Bump it
+#   only when feature names, definitions, windows, cleaning thresholds, weather points or the
+#   run rule change (see docs/features.md).
+feature_version: v1
+
 bafu_backfill_start: 2011-01-01
 weather_start: 2024-08-07
 as_of_offset_hours: 3
