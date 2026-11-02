@@ -99,8 +99,9 @@ class RawStore:
             df = df[df["timestamp"] >= from_timestamp].reset_index(drop=True)
         return df
 
-    def read_weather(self):
-        return self._read("weather")
+    def read_weather(self, from_run_date=None):
+        """All stored weather rows. With from_run_date: runs stored under that date or later."""
+        return self._read("weather", from_run_date)
 
     def _write(self, kind, partition_date, unit, rows):
         if SEPARATOR in unit or "/" in unit:

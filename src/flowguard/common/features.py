@@ -163,11 +163,40 @@ def _series_features(s, prefix):
         earlier = s.shift(freq=pd.Timedelta(lag)).reindex(s.index)
         out[f"{prefix}_{name}"] = s - earlier
     for name, hours in WINDOWS.items():
-        # The time-based window (t - hours, t] holds `hours` grid hours.
-        window = s.rolling(f"{hours}h", min_periods=math.ceil(MIN_SHARE * hours))
+        stats = _rolling_stats(s, hours)
         for stat in STATS:
-            out[f"{prefix}_{name}_{stat}"] = getattr(window, stat)()
+            out[f"{prefix}_{name}_{stat}"] = stats[stat]
     return out
+
+
+def _rolling_stats(s, hours):
+    """mean, std (ddof 1), min, max over the window (t - hours, t], per hour t.
+
+    The index is the regular hourly grid, so the window is the last `hours` positions. Every
+    window is computed on its own values. pandas' rolling mean and std carry rounding errors
+    along the series, so a series that starts later would give slightly different numbers, and
+    an incremental build would not equal a full build.
+    """
+    x = s.to_numpy(dtype=float)
+    # NaN in front: the first windows reach back before the start of the series.
+    padded = np.concatenate([np.full(hours - 1, np.nan), x])
+    window = np.lib.stride_tricks.sliding_window_view(padded, hours)
+    valid = ~np.isnan(window)
+    count = valid.sum(axis=1)
+    enough = count >= math.ceil(MIN_SHARE * hours)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        mean = np.where(valid, window, 0.0).sum(axis=1) / count
+        deviation = np.where(valid, window - mean[:, None], 0.0)
+        std = np.sqrt((deviation**2).sum(axis=1) / (count - 1))
+    low = np.where(valid, window, np.inf).min(axis=1)
+    high = np.where(valid, window, -np.inf).max(axis=1)
+
+    stats = {"mean": mean, "std": std, "min": low, "max": high}
+    return {
+        name: pd.Series(np.where(enough, values, np.nan), index=s.index)
+        for name, values in stats.items()
+    }
 
 
 def _release_states(grid, index):
