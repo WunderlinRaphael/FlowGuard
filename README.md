@@ -1,6 +1,6 @@
 # FlowGuard
 
-FlowGuard forecasts the water level of the Reuss and the Schächen in canton Uri, 24 hours ahead, and turns each forecast into a risk band: low flow, normal or flood risk. Most flood tools look only at floods. I also want to catch the other end, droughts, which get less attention. The project is part of the HSLU module MLOps (HS26). It is a live system in the feature, training and inference (FTI) style, and it runs on a schedule.
+FlowGuard forecasts the water level of the Reuss and the Schächen in canton Uri, 24 hours ahead, and turns each forecast into a risk band: low water, normal or high water. Most flood tools look only at floods. I also want to catch the other end, droughts, which get less attention. The project is part of the HSLU module MLOps (HS26). It is a live system in the feature, training and inference (FTI) style, and it runs on a schedule.
 
 ## Stations
 
@@ -16,7 +16,7 @@ The data comes from the Swiss Federal Office for the Environment (BAFU). I forec
 
 ## Status
 
-Milestone 2 (data and features) is done. An hourly GitHub Actions job pulls BAFU and weather data into Cloud Storage and then builds the feature table. History from 2011 for BAFU and from August 2024 for the weather forecasts is backfilled. Not built yet: training, model registry, inference service and dashboard (milestones 3 and 4). GitHub sometimes starts the hourly job less often than hourly. Every run fetches the last 48 hours again, so a skipped run does not lose data.
+Milestone 2 (data and features) is done. An hourly GitHub Actions job pulls BAFU and weather data into Cloud Storage and then builds the feature table. History from 2011 for BAFU and from August 2024 for the weather forecasts is backfilled. Not built yet: training, model registry, inference service and dashboard (milestones 3 and 4). GitHub sometimes skips scheduled runs; the 48-hour refetch covers that.
 
 ## Architecture
 
@@ -59,16 +59,16 @@ flowchart LR
 ## How it works
 
 - **Feature pipeline:** every hour a GitHub Actions job pulls new BAFU and weather data, builds the features and writes them as versioned Parquet files. The feature code lives once in `common/` and is used by training and inference.
-- **Training pipeline:** a weekly or manual job reads the stored features, trains one pooled LightGBM model for all three stations and logs it in MLflow.
-- **Inference:** a service on Google Cloud Run loads the registered model, forecasts the level 24 hours ahead and shows the risk band on a dashboard.
-- **Target:** the change of the level over 24 hours in cm, added to the current level. The goal is a mean absolute error of at most 3 cm per station, better than the simple baseline that tomorrow equals today.
-- **Risk bands:** low below the station's own 10th percentile, flood risk above the 90th, normal in between. The percentiles come from the training period only.
+- **Training pipeline:** a weekly or manual job reads the stored features, trains one pooled LightGBM model for all three stations and logs it in MLflow (planned, milestone 3).
+- **Inference:** a service on Google Cloud Run loads the registered model, forecasts the level 24 hours ahead and shows the risk band on a dashboard (planned, milestone 4).
+- **Target:** the change of the level over 24 hours in cm, added to the current level. The goal is to beat the simple baseline that tomorrow equals today at every station. At Andermatt I also aim for a mean absolute error of at most 3 cm. At Seedorf I aim for at most 80 percent of the baseline error, because the level there jumps with hydropeaking.
+- **Risk bands:** low water below the station's own 10th percentile, high water above the 90th, normal in between. The percentiles come from the training period only. The bands describe high and low water relative to the station, not an official flood level.
 - **Split:** three separate time segments (train, validation, test), cut at the same date for all stations, never shuffled.
 
 ## Data
 
 - **Water data:** BAFU hydrological data service (GraphQL API, no login). I use the hourly means of discharge Q and water level W, and temperature WT at Seedorf. BAFU rejects queries over 10,000 rows, so the client asks in 30-day windows. Fallbacks: BAFU's monthly bulk files, hydrodaten.admin.ch and existenz.ch.
-- **Weather data:** Open-Meteo, with ECMWF forecasts as they were issued, so the model never sees a forecast that did not exist yet. Weather data by [Open-Meteo.com](https://open-meteo.com/), licensed CC BY 4.0, used non-commercially.
+- **Weather data:** Open-Meteo, with ECMWF forecasts as they were issued, so the model never sees a forecast that did not exist yet. Weather data by [Open-Meteo.com](https://open-meteo.com/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The forecasts are aggregated into features, so the data is changed.
 
 ### Storage
 
@@ -105,6 +105,8 @@ GitHub does not guarantee the schedule. A run can start late or be skipped; the 
 - **Docker** gives the same environment on my laptop, in CI and on Cloud Run.
 - **LightGBM** is a strong, fast model for tabular features and handles missing values, which happen with live data.
 - **MLflow** tracks experiments and holds the model registry. It will run on DagsHub, which hosts one MLflow server per repository for free and accepts a token from GitHub Actions and Cloud Run. This is set up in milestone 3. Until then it runs on a local file store.
+- **uv** gives a locked environment, so my laptop, CI and the Docker image install the same versions.
+- **Parquet on Google Cloud Storage** is cheap and columnar and needs no database server.
 - **Google Cloud (Cloud Run, Cloud Storage)** carries the $50 course credit.
 
 ## Known limits
@@ -114,14 +116,15 @@ GitHub does not guarantee the schedule. A run can start late or be skipped; the 
 - About 500 km2 of the Reuss catchment between Andermatt and Seedorf has no gauge. Weather points stand in for it.
 - Three forecast stations are few, so results for single extreme events are uncertain.
 - Eleven weather forecast runs do not exist at Open-Meteo. For those hours the pipeline falls back to the newest earlier run, or leaves the value missing.
-- GitHub Actions does not guarantee the hourly schedule. In the first week the job ran about four to five times a day instead of 24.
+- The validation and test periods are quiet. Some risk bands have too few rows or episodes there, so I report them as not evaluable instead of giving a number.
+- GitHub Actions does not guarantee the hourly schedule. Runs can start late or be skipped. Every run fetches the last 48 hours again, so a skipped run does not lose data. If BAFU has not published an hour, it stays a missing hour in the data.
 
 ## Setup and run
 
 You need Python 3.12, [uv](https://docs.astral.sh/uv/) and, for the image, Docker.
 
 ```bash
-git clone <repository url>
+git clone https://github.com/WunderlinRaphael/FlowGuard.git
 cd FlowGuard
 uv sync --locked
 cp .env.example .env     # optional; .env is ignored by git
@@ -134,6 +137,18 @@ uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 ```
+
+### Try it in a few minutes (no Google login)
+
+This fetches a short recent history into the local folder `data/`, runs one ingest and builds the features. It needs internet but no key and no login. Use dates about 10 days (BAFU) and 5 days (weather) back; the example is for 3 November 2026. The weather features need three days of runs before the first hour, so a shorter range gives almost no weather columns.
+
+```bash
+uv run python -m flowguard.features.backfill --bafu-start 2026-10-24 --weather-start 2026-10-29
+uv run python -m flowguard.features.ingest
+uv run python -m flowguard.features.build
+```
+
+This took about 1.5 minutes in total (backfill about 1 minute). The build printed 251 rows per forecast station, 226 of them with a target and 60 with weather features. The first line of the build output shows the feature version. Make sure `FLOWGUARD_STORE` is not set to a `gs://` path in `.env`. To start over, delete `data/`.
 
 ### Storage location and Google Cloud login
 
@@ -261,4 +276,4 @@ Nothing else is needed in the repository to clone, test and build.
 
 Four earlier projects from the KTH course ID2223 work on similar problems. The UK flooding project (2023/24) is a batch system with a dashboard on the national flood-monitoring data. The Stockholm streamflow project (2022/23) predicts streamflow at three locations with XGBoost, using SMHI data and Open-Meteo weather, and runs on Modal and Hopsworks. "Predicting Water Levels" (2025/26) forecasts daily lake levels with one tree model per lake, from lagged levels and weather at surrounding points. "Global River Flooding Prediction" (2025/26) classifies flood danger with logistic regression on streamed data.
 
-FlowGuard differs in five ways. It forecasts hourly and 24 hours ahead, not daily. It works on a connected gauge network: measured upstream gauges and a diversion flow feed the forecast stations in one pooled model. It scores the high and the low water band against a persistence baseline (tomorrow equals today), so a result only counts if it beats that. It uses weather forecasts as they were issued at the time of the prediction, so no later information leaks into training. And the split, the embargo and the BAFU release state are documented in `docs/`. I do not claim trend features or a chronological split as new, they are standard.
+FlowGuard differs in five ways. It forecasts hourly and 24 hours ahead, not daily. It works on a connected gauge network: measured upstream gauges and a diversion flow feed the forecast stations in one pooled model (planned). It will score the high and the low water band against a persistence baseline (tomorrow equals today), so a result only counts if it beats that. It uses weather forecasts as they were issued at the time of the prediction, so no later information leaks into training. And the split, the embargo and the BAFU release state are documented in `docs/`. I do not claim trend features or a chronological split as new, they are standard.
