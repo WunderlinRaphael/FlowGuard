@@ -148,7 +148,7 @@ uv run python -m flowguard.features.ingest
 uv run python -m flowguard.features.build
 ```
 
-This took about 1.5 minutes in total (backfill about 1 minute). The build printed 251 rows per forecast station, 226 of them with a target and 60 with weather features. The first line of the build output shows the feature version. Make sure `FLOWGUARD_STORE` is not set to a `gs://` path in `.env`. To start over, delete `data/`.
+This took about 1.5 minutes in total (backfill about 1 minute). On 3 November the build printed 251 rows per forecast station, 226 of them with a target and 60 with weather features. The counts grow every day, so expect higher numbers later; on 5 November it printed 302, 277 and 111. The first line of the build output shows the feature version. Make sure `FLOWGUARD_STORE` is not set to a `gs://` path in `.env`. To start over, delete `data/`.
 
 ### Storage location and Google Cloud login
 
@@ -234,7 +234,7 @@ uv run python -m flowguard.features.build --since 2026-10-01   # only the months
 
 ### Docker
 
-The image runs the hourly ingest by default. The backfill runs from the same image by changing the entry point:
+The image runs the hourly ingest by default. The backfill runs from the same image by changing the entry point. The ingest example fetches live data into ./data.
 
 ```bash
 docker build -t flowguard .
