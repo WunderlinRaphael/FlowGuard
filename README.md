@@ -16,7 +16,7 @@ The data comes from the Swiss Federal Office for the Environment (BAFU). I forec
 
 ## Status
 
-Milestone 2 (data and features) is done. An hourly GitHub Actions job pulls BAFU and weather data into Cloud Storage and then builds the feature table. History from 2011 for BAFU and from August 2024 for the weather forecasts is backfilled. Not built yet: training, model registry, inference service and dashboard (milestones 3 and 4). GitHub sometimes skips scheduled runs; the 48-hour refetch covers that.
+Milestone 2 (data and features) is done. An hourly GitHub Actions job pulls BAFU and weather data into Cloud Storage and then builds the feature table. History from 2011 for BAFU and from August 2024 for the weather forecasts is backfilled. Not built yet: training, model registry, inference service and dashboard (milestones 3 and 4). GitHub starts the hourly job less often than hourly, and the 48-hour refetch means a run that does not start loses no data.
 
 ## Architecture
 
@@ -117,7 +117,7 @@ GitHub does not guarantee the schedule. A run can start late or be skipped; the 
 - Three forecast stations are few, so results for single extreme events are uncertain.
 - Eleven weather forecast runs do not exist at Open-Meteo. For those hours the pipeline falls back to the newest earlier run, or leaves the value missing.
 - The validation and test periods are quiet. Some risk bands have too few rows or episodes there, so I report them as not evaluable instead of giving a number.
-- GitHub Actions does not guarantee the hourly schedule. Runs can start late or be skipped. Every run fetches the last 48 hours again, so a skipped run does not lose data. If BAFU has not published an hour, it stays a missing hour in the data.
+- GitHub starts the hourly job less often than hourly, in the first week about every 4 to 8 hours. Every run fetches the last 48 hours again, so a run that does not start loses no data. If BAFU has not published an hour, it stays a missing hour in the data.
 
 ## Setup and run
 
@@ -265,7 +265,7 @@ Nothing else is needed in the repository to clone, test and build.
 | `scripts/` | One-off probes of the BAFU and Open-Meteo APIs and the baseline analysis behind `docs/eda_notes.md` |
 | `data/` | Local copy of the store (`raw/`, `features/`), not in git |
 | `tests/` | Unit tests and recorded BAFU and Open-Meteo responses (`fixtures/`) |
-| `docs/` | [`data_notes.md`](docs/data_notes.md) (probe results, cleaning thresholds, fallback sources), [`features.md`](docs/features.md) (feature catalogue, storage, versioning), [`eda_notes.md`](docs/eda_notes.md) (persistence baseline, event counts, travel time), [`proposal.pdf`](docs/proposal.pdf); `ms2_summary.pdf` is added for milestone 2 |
+| `docs/` | [`data_notes.md`](docs/data_notes.md) (probe results, cleaning thresholds, fallback sources), [`features.md`](docs/features.md) (feature catalogue, storage, versioning), [`eda_notes.md`](docs/eda_notes.md) (persistence baseline, event counts, travel time), [`proposal.pdf`](docs/proposal.pdf); [`ms2_summary.pdf`](docs/ms2_summary.pdf) |
 | `notebooks/`, `ui/` | Planned, empty for now |
 | `.github/workflows/` | `ci.yml`, `ingest.yml`, `backfill.yml`, `features.yml` |
 | `Dockerfile`, `.dockerignore` | Two-stage image (python:3.12-slim, uv, non-root user), default command is the ingest |
