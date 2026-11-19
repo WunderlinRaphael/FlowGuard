@@ -22,6 +22,8 @@ data/
 models/
 mlruns/
 mlartifacts/
+*.pkl
+*.joblib
 
 # Secrets
 .env
