@@ -16,6 +16,11 @@ dev = [
     "pytest",
     "ruff",
 ]
+train = [
+    "lightgbm==4.7.0",
+    "mlflow==3.18.0",
+    "scikit-learn==1.9.1",
+]
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]

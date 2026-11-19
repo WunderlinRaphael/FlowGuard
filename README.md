@@ -16,7 +16,7 @@ The data comes from the Swiss Federal Office for the Environment (BAFU). I forec
 
 ## Status
 
-Milestone 2 (data and features) is done. An hourly GitHub Actions job pulls BAFU and weather data into Cloud Storage and then builds the feature table. History from 2011 for BAFU and from August 2024 for the weather forecasts is backfilled. Not built yet: training, model registry, inference service and dashboard (milestones 3 and 4). GitHub starts the hourly job less often than hourly, and the 48-hour refetch means a run that does not start loses no data.
+Milestone 2 (data and features) is done. An hourly GitHub Actions job pulls BAFU and weather data into Cloud Storage and then builds the feature table. History from 2011 for BAFU and from August 2024 for the weather forecasts is backfilled. Milestone 3 has started: a training script compares persistence, Ridge and LightGBM on the validation segment and logs the runs to MLflow. Not built yet: model registry, retraining, inference service and dashboard (milestones 3 and 4). GitHub starts the hourly job less often than hourly, and the 48-hour refetch means a run that does not start loses no data.
 
 ## Architecture
 
@@ -90,7 +90,7 @@ features/v1/_manifest.json
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
-| `ci.yml` | every push and pull request | `uv sync --locked`, ruff check and format check, pytest, and a Docker build without push |
+| `ci.yml` | every push and pull request | `uv sync --locked --group train`, ruff check and format check, pytest, and a Docker build without push |
 | `ingest.yml` | every hour at minute 17 (UTC) and manual | job `ingest`: the hourly ingest into the bucket. Job `features` (after `ingest`, timeout 15 min): incremental feature build from the first day of the previous month on, into `features/v1/` |
 | `backfill.yml` | manual, input `source` = `bafu` or `weather` | the resumable backfill into the bucket (timeout 5.5 h) |
 | `features.yml` | manual, optional input `since` (YYYY-MM-DD) | builds the feature table from the raw data in the bucket and writes it to `features/v1/` (timeout 30 min) |
@@ -126,7 +126,7 @@ You need Python 3.12, [uv](https://docs.astral.sh/uv/) and, for the image, Docke
 ```bash
 git clone https://github.com/WunderlinRaphael/FlowGuard.git
 cd FlowGuard
-uv sync --locked
+uv sync --locked --group train   # the train group (LightGBM, scikit-learn, MLflow) is not in the Docker image
 cp .env.example .env     # optional; .env is ignored by git
 ```
 
@@ -232,6 +232,15 @@ uv run python -m flowguard.features.build                      # full build (abo
 uv run python -m flowguard.features.build --since 2026-10-01   # only the months from October 2026 on
 ```
 
+Compare the model ladder on the validation segment (needs the feature table, see above; the test segment is never read here). Results go to MLflow, local folder `mlruns/` (not in git); `uv run mlflow ui` shows them:
+
+```bash
+uv run python -m flowguard.training.train --store gs://flowguard-hs26-data   # or a local folder
+uv run python -m flowguard.training.train --features weather                  # level, weather or all (default)
+```
+
+It fits persistence, Ridge (level and weather features) and pooled LightGBM (level on all history, level on the weather period only, weather) and prints the validation MAE in cm per station, the ratio to persistence, the fit time and the early-stopping iteration. LightGBM stops early on the validation segment, so its validation score is slightly optimistic. About a minute on local files. On macOS LightGBM needs `brew install libomp`.
+
 ### Docker
 
 The image runs the hourly ingest by default. The backfill runs from the same image by changing the entry point. The ingest example fetches live data into ./data.
@@ -260,7 +269,8 @@ Nothing else is needed in the repository to clone, test and build.
 | --- | --- |
 | `src/flowguard/common/` | Station list loader (`stations.py`), pipeline settings loader (`pipeline_config.py`), append-only raw store (`raw_store.py`), range, spike and flat-line checks with a causal mode for features (`cleaning.py`), chronological split with embargo (`split.py`), lag and rolling features per target station (`features.py`, W and Q of the station, its upstream slots and the diversion flows, plus the 24 h target), weather composite series and weather features per catchment point from the stored model runs (`weather_features.py`), the joined feature table (`feature_table.py`) |
 | `src/flowguard/features/` | BAFU GraphQL client (`bafu_client.py`), Open-Meteo weather client (`weather_client.py`), hourly grid (`hourly_grid.py`), gap report (`gap_report.py`), backfill command (`backfill.py`), hourly ingest command (`ingest.py`), feature table storage and manifest (`feature_store.py`), feature build command (`build.py`) |
-| `src/flowguard/training/`, `src/flowguard/inference/` | Planned, empty for now |
+| `src/flowguard/training/` | Feature table loader and train and validation sets (`data.py`), model ladder (`ladder.py`), training command with MLflow logging (`train.py`) |
+| `src/flowguard/inference/` | Planned, empty for now |
 | `config/` | `stations.yaml`: stations, roles, parameters and upstream mapping. `pipeline.yaml`: start dates, as-of rule, weather points, cleaning thresholds, split dates and feature version |
 | `scripts/` | One-off probes of the BAFU and Open-Meteo APIs and the baseline analysis behind `docs/eda_notes.md` |
 | `data/` | Local copy of the store (`raw/`, `features/`), not in git |
