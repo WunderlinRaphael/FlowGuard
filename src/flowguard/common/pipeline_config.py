@@ -8,6 +8,7 @@ from pathlib import Path
 import yaml
 
 from flowguard.common.cleaning import CleaningConfig, parse_cleaning_config
+from flowguard.common.evaluation import EvaluationConfig, parse_evaluation_config
 from flowguard.common.split import SplitConfig, parse_split_config
 
 # src/flowguard/common/pipeline_config.py -> repository root is three levels above this folder.
@@ -32,6 +33,7 @@ class PipelineConfig:
     weather_points: tuple[WeatherPoint, ...]
     cleaning: CleaningConfig
     split: SplitConfig
+    evaluation: EvaluationConfig
     # Schema version of the stored feature table (features/<feature_version>/ in the store).
     feature_version: str
 
@@ -59,6 +61,7 @@ def load_pipeline_config(path=CONFIG_PATH):
         ),
         cleaning=parse_cleaning_config(raw["cleaning"]),
         split=parse_split_config(raw["split"]),
+        evaluation=parse_evaluation_config(raw["evaluation"]),
         feature_version=str(raw["feature_version"]),
     )
     validate(config)

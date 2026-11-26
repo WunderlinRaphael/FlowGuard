@@ -77,8 +77,9 @@ cleaning:
 #   An origin t belongs to a segment only if t and t + embargo_hours are inside it, so the last
 #   embargo_hours of each segment are embargo. From test_end on rows are live and never used
 #   for training or selection.
-#   Provisional (29.10.2026). Frozen after the persistence analysis (step 2); never change them
-#   after a score on validation or test has been seen.
+#   FROZEN (decision 30.10.2026). The dates have not changed since they were first committed.
+#   Moving one needs a new decision and a note in the milestone summary. tests/test_pipeline_config.py
+#   pins the exact values, so a change fails CI.
 split:
   train_start:
   train_end: 2026-03-15
@@ -87,3 +88,19 @@ split:
   test_start: 2026-06-15
   test_end: 2026-10-01
   embargo_hours: 24
+
+# evaluation: rules for scoring the risk bands (common/evaluation.py, training/bands.py,
+#   docs/evaluation.md). Fixed before any band is scored.
+#   min_episodes_per_band: applies to the low and flood bands (the normal band is always scored).
+#     A band in a segment needs at least this many separate events to count toward the success
+#     criterion. Fewer: it is reported with rows and episodes only.
+#   episode_gap_hours: band hours more than this far apart are separate events (the definition
+#     of scripts/eda_baseline.py).
+#   pool_thin_bands: a band below the minimum at one station is pooled over the three stations
+#     as one event set (union of the origin hours, so one flood wave over all three gauges counts
+#     once; this is the stricter rule). The band is evaluable only if the pooled set has the
+#     minimum.
+evaluation:
+  min_episodes_per_band: 5
+  episode_gap_hours: 24
+  pool_thin_bands: true

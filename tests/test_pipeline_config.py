@@ -18,6 +18,9 @@ SPLIT = {
 }
 
 
+EVALUATION = {"min_episodes_per_band": 5, "episode_gap_hours": 24, "pool_thin_bands": True}
+
+
 def write_config(tmp_path, **changes):
     raw = {
         "bafu_backfill_start": "2011-01-01",
@@ -27,6 +30,7 @@ def write_config(tmp_path, **changes):
         "weather_points": [POINT],
         "cleaning": CLEANING,
         "split": SPLIT,
+        "evaluation": EVALUATION,
         "feature_version": "v1",
         **changes,
     }
@@ -103,10 +107,15 @@ def test_real_config_has_complete_cleaning_rules_for_every_series():
                 )
 
 
-def test_real_config_split_dates():
+def test_real_config_split_dates_are_frozen():
+    # Frozen on 30.10.2026. If this fails, the split was moved: that needs a new decision
+    # and a note in the milestone summary, not just a new number here.
     split = load_pipeline_config().split
     assert split.train_start is None
     assert split.train_end == datetime(2026, 3, 15, tzinfo=UTC)
+    assert split.val_start == datetime(2026, 3, 15, tzinfo=UTC)
+    assert split.val_end == datetime(2026, 6, 15, tzinfo=UTC)
+    assert split.test_start == datetime(2026, 6, 15, tzinfo=UTC)
     assert split.test_end == datetime(2026, 10, 1, tzinfo=UTC)
     assert split.embargo_hours == 24
 
@@ -139,3 +148,35 @@ def test_feature_version_is_required(tmp_path):
 def test_feature_version_must_look_like_v1(tmp_path):
     with pytest.raises(ValueError, match="feature_version"):
         load_pipeline_config(write_config(tmp_path, feature_version="1.0"))
+
+
+def test_real_config_evaluation_rules():
+    evaluation = load_pipeline_config().evaluation
+    assert evaluation.min_episodes_per_band == 5
+    assert evaluation.episode_gap == timedelta(hours=24)
+    assert evaluation.pool_thin_bands is True
+
+
+def test_evaluation_section_is_required(tmp_path):
+    path = write_config(tmp_path)
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    del raw["evaluation"]
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    with pytest.raises(KeyError):
+        load_pipeline_config(path)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"min_episodes_per_band": 0},
+        {"min_episodes_per_band": 2.5},
+        {"min_episodes_per_band": True},
+        {"episode_gap_hours": 0},
+        {"pool_thin_bands": "yes"},
+    ],
+)
+def test_invalid_evaluation_rules_are_rejected(tmp_path, change):
+    path = write_config(tmp_path, evaluation={**EVALUATION, **change})
+    with pytest.raises(ValueError, match="evaluation"):
+        load_pipeline_config(path)
