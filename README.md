@@ -63,6 +63,7 @@ flowchart LR
 - **Inference:** a service on Google Cloud Run loads the registered model, forecasts the level 24 hours ahead and shows the risk band on a dashboard (planned, milestone 4).
 - **Target:** the change of the level over 24 hours in cm, added to the current level. The goal is to beat the simple baseline that tomorrow equals today at every station. At Andermatt I also aim for a mean absolute error of at most 3 cm. At Seedorf I aim for at most 80 percent of the baseline error, because the level there jumps with hydropeaking.
 - **Risk bands:** low water below the station's own 10th percentile, high water above the 90th, normal in between. The percentiles come from the training period only. The bands describe high and low water relative to the station, not an official flood level.
+- **Evaluation rule:** a band counts toward the success criterion only with enough separate events in the segment, otherwise it is reported only. Details in [`docs/evaluation.md`](docs/evaluation.md).
 - **Split:** three separate time segments (train, validation, test), cut at the same date for all stations, never shuffled.
 
 ## Data
@@ -267,15 +268,15 @@ Nothing else is needed in the repository to clone, test and build.
 
 | Path | Content |
 | --- | --- |
-| `src/flowguard/common/` | Station list loader (`stations.py`), pipeline settings loader (`pipeline_config.py`), append-only raw store (`raw_store.py`), range, spike and flat-line checks with a causal mode for features (`cleaning.py`), chronological split with embargo (`split.py`), lag and rolling features per target station (`features.py`, W and Q of the station, its upstream slots and the diversion flows, plus the 24 h target), weather composite series and weather features per catchment point from the stored model runs (`weather_features.py`), the joined feature table (`feature_table.py`) |
+| `src/flowguard/common/` | Station list loader (`stations.py`), pipeline settings loader (`pipeline_config.py`), append-only raw store (`raw_store.py`), range, spike and flat-line checks with a causal mode for features (`cleaning.py`), chronological split with embargo (`split.py`), evaluation rules (`evaluation.py`), lag and rolling features per target station (`features.py`, W and Q of the station, its upstream slots and the diversion flows, plus the 24 h target), weather composite series and weather features per catchment point from the stored model runs (`weather_features.py`), the joined feature table (`feature_table.py`) |
 | `src/flowguard/features/` | BAFU GraphQL client (`bafu_client.py`), Open-Meteo weather client (`weather_client.py`), hourly grid (`hourly_grid.py`), gap report (`gap_report.py`), backfill command (`backfill.py`), hourly ingest command (`ingest.py`), feature table storage and manifest (`feature_store.py`), feature build command (`build.py`) |
-| `src/flowguard/training/` | Feature table loader and train and validation sets (`data.py`), model ladder (`ladder.py`), training command with MLflow logging (`train.py`) |
+| `src/flowguard/training/` | Feature table loader and train and validation sets (`data.py`), model ladder (`ladder.py`), training command with MLflow logging (`train.py`), risk bands and episode counts (`bands.py`) |
 | `src/flowguard/inference/` | Planned, empty for now |
-| `config/` | `stations.yaml`: stations, roles, parameters and upstream mapping. `pipeline.yaml`: start dates, as-of rule, weather points, cleaning thresholds, split dates and feature version |
+| `config/` | `stations.yaml`: stations, roles, parameters and upstream mapping. `pipeline.yaml`: start dates, as-of rule, weather points, cleaning thresholds, split dates, evaluation rules and feature version |
 | `scripts/` | One-off probes of the BAFU and Open-Meteo APIs and the baseline analysis behind `docs/eda_notes.md` |
 | `data/` | Local copy of the store (`raw/`, `features/`), not in git |
 | `tests/` | Unit tests and recorded BAFU and Open-Meteo responses (`fixtures/`) |
-| `docs/` | [`data_notes.md`](docs/data_notes.md) (probe results, cleaning thresholds, fallback sources), [`features.md`](docs/features.md) (feature catalogue, storage, versioning), [`eda_notes.md`](docs/eda_notes.md) (persistence baseline, event counts, travel time), [`proposal.pdf`](docs/proposal.pdf); [`ms2_summary.pdf`](docs/ms2_summary.pdf) |
+| `docs/` | [`data_notes.md`](docs/data_notes.md) (probe results, cleaning thresholds, fallback sources), [`features.md`](docs/features.md) (feature catalogue, storage, versioning), [`eda_notes.md`](docs/eda_notes.md) (persistence baseline, event counts, travel time), [`evaluation.md`](docs/evaluation.md) (success criterion, band evaluation rule), [`proposal.pdf`](docs/proposal.pdf); [`ms2_summary.pdf`](docs/ms2_summary.pdf) |
 | `notebooks/`, `ui/` | Planned, empty for now |
 | `.github/workflows/` | `ci.yml`, `ingest.yml`, `backfill.yml`, `features.yml` |
 | `Dockerfile`, `.dockerignore` | Two-stage image (python:3.12-slim, uv, non-root user), default command is the ingest |
